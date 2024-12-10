@@ -97,8 +97,7 @@ Citations:
 
 ## Data Processing and Summary Statistics 
 
-
-Import data 
+First, let's import the data into our workspace
 ```{r}
 data <- read.csv("used_cars.csv")
 ```
@@ -165,9 +164,84 @@ cat("Empty Values:", nrow(empty_space_rows), "\n")
 summary(data)
 ```
 
+##performing pca 
+```{r}
+library(ggplot2)
+data_scaled <- scale(data)
+
+pca_result <- prcomp(iris_data_scaled, center = TRUE, scale. = TRUE)
+
+```
 
 ## Unsupervised Learning 
+Apply at least three clustering algorithms to the processed dataset.
+Determine the appropriate number of clusters and discuss the interpretability of these clusters. Do they hold any meaningful distinctions?
+Examine whether the clustering results are associated with your outcome variable.
+1. KMeans Clustering 
+```{r}
+set.seed(1)
+
+usedcars.kmean <- kmeans(data[, -ncol(data)])
+```
+
+2. Hierarchical Clustering 
+
+Next, we will try hierarchical clustering with three different linkage methods(single, complete, and average) using euclidean distance. Hierarchical Clustering begins with each data point starting as its own cluster. The goal is to progressively group them together until there is only one group. The process involves choosing the closest two groups, calculated through a specific distance metric. 
+```{r}
+hclust_simple <- hclust(dist(train[, -ncol(data)], method="euclidean"), method = "single")
+hclust_complete <- hclust(dist(train[, -ncol(data)], method = "euclidean"), method = "complete")
+hclust_average <- hclust(dist(train[, -ncol(data)], method = "euclidean"), method = "average")
+```
+
+
+3. Spectral Clustering 
+
+Finally, we will try spectral clustering, which aims to group observations based on their proximity information. This method involves 2 main steps, the first being using the eigenvalues of a similarity matrix to perform dimension reduction, followed by applying a clustering algorithm like K-means. 
+
+```{r}
+set.seed(1)
+library(kernlab)
+specc_result <- specc(as.matrix(train[, -1]), centers = 3, kernel = "rbfdot")
+```
+
 
 ## Prediction Models 
+Implement at least five different regression models to predict the price and tune their parameters appropriately.
+You may use models beyond those covered in this course. However, at least four models should be ones introduced in class. If you incorporate a new model, provide a detailed description of it.
+All linear models (e.g., OLS) and penalized linear models (Lasso, Ridge, Elastic Net) will be treated as the same model. KNN and Nadaraya-Watson kernel estimators are treated as the same model. If you use KNN or NW Kernel Estimators, you should discuss what distance metric is used, especially for the categorical variables.
+Tune each model carefully, and clearly explain the tuning process for each. State your evaluation criteria and, if multiple criteria are used, discuss their advantages and disadvantages.
+Provide sufficient information, including tables, figures, and explanations, to illustrate the model-fitting results. Which model appears to perform best?
+Identify the variable(s) you constructed that seem to be most predictive, and provide interpretations of their impact on the model.
+
+First, we are going to split our data into training and testing datasets. 
+```{r}
+test_idx = sample(nrow(data), size = 0.2 * nrow(data))
+trainx = X[ -test_idx, ]
+testx  = X[ test_idx, ]
+trainy = y[ -test_idx ]
+testy  = y[ test_idx ]
+```
+
+1. Linear Model. We will be using elastic net regression, which is 
+```{r}
+lm_model <- lm(train_labels ~ ., data = as.data.frame(train_data))
+
+# Make predictions on the test set
+lm_predictions <- predict(lm_model, newdata = as.data.frame(test_data))
+```
+2. KNN 
+3. Random Forest 
+```{r}
+library(randomForest)
+rf_model <- randomForest(train_labels ~ ., data = as.data.frame(train_data))
+
+rf_predictions <- predict(rf_model, newdata = as.data.frame(test_data))
+```
+4. SVM? does this count as a linear model 
+5. Gradient Boosting Regressor 
 
 ## Open-Ended Question/Conclusion
+A researcher is interested in estimating the original price of the cars in your dataset as if they were brand new. 
+
+Several challenges arise from this approach. 
+
