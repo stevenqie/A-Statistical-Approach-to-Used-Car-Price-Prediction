@@ -169,7 +169,30 @@ summary(data)
 
 
 ## Unsupervised Learning 
+Apply at least three clustering algorithms to the processed dataset.
+Determine the appropriate number of clusters and discuss the interpretability of these clusters. Do they hold any meaningful distinctions?
+Examine whether the clustering results are associated with your outcome variable.
+1. KMeans Clustering 
+2. DBSCAN Clustering 
+3. Hierarchal Clustering 
 
 ## Prediction Models 
+Implement at least five different regression models to predict the price and tune their parameters appropriately.
+You may use models beyond those covered in this course. However, at least four models should be ones introduced in class. If you incorporate a new model, provide a detailed description of it.
+All linear models (e.g., OLS) and penalized linear models (Lasso, Ridge, Elastic Net) will be treated as the same model. KNN and Nadaraya-Watson kernel estimators are treated as the same model. If you use KNN or NW Kernel Estimators, you should discuss what distance metric is used, especially for the categorical variables.
+Tune each model carefully, and clearly explain the tuning process for each. State your evaluation criteria and, if multiple criteria are used, discuss their advantages and disadvantages.
+Provide sufficient information, including tables, figures, and explanations, to illustrate the model-fitting results. Which model appears to perform best?
+Identify the variable(s) you constructed that seem to be most predictive, and provide interpretations of their impact on the model.
+
+1. Linear Model(probably elastic net cause it combines both lasso and ridge)
+2. KNN 
+3. Random Forest 
+4. LDA or QDA
+5. SVM? does this count as a linear model 
+6. Gradient Boosting
 
 ## Open-Ended Question/Conclusion
+A researcher is interested in estimating the original price of the cars in your dataset as if they were brand new. 
+
+Several challenges arise from this approach. 
+
