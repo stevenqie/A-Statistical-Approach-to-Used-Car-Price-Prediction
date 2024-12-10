@@ -109,7 +109,6 @@ head(data)
 na_values <- data[!complete.cases(data), ]
 cat("NA Values:", nrow(na_values), "\n")
 empty_space_rows <-  data[rowSums(data == "", na.rm = TRUE) > 0, ]
-print(empty_space_rows)
 cat("Empty Values:", nrow(empty_space_rows), "\n")
 ```
 Just looking at the data, some notable columns to do some preprocessing is accident,engine. Price and mileage can use some preprocessing to make into a number. Also, milage is spelled wrong. Although there seems to be no NA values, a lot of rows of clean_title are notably empty. Other cols like fuel_type and accident also contain some empty values
@@ -158,7 +157,6 @@ Updated the name of milage column to -> mileage. Removed mi. and , to enable num
 
 ```{r}
 empty_space_rows <-  data[rowSums(data == "", na.rm = TRUE) > 0, ]
-print(empty_space_rows)
 cat("Empty Values:", nrow(empty_space_rows), "\n")
 ```
 
