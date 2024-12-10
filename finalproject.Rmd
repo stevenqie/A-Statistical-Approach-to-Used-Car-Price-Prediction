@@ -52,6 +52,77 @@ The first paper of interest is "Price Prediction of Used Cars Using Machine Lear
 
 ## Data Processing and Summary Statistics 
 
+
+Import data 
+```{r}
+data <- read.csv("used_cars.csv")
+```
+
+quick overview of data
+```{r}
+head(data)
+na_values <- data[!complete.cases(data), ]
+cat("NA Values:", nrow(na_values), "\n")
+empty_space_rows <-  data[rowSums(data == "", na.rm = TRUE) > 0, ]
+print(empty_space_rows)
+cat("Empty Values:", nrow(empty_space_rows), "\n")
+```
+Just looking at the data, some notable columns to do some preprocessing is accident,engine. Price and mileage can use some preprocessing to make into a number. Also, milage is spelled wrong. Although there seems to be no NA values, a lot of rows of clean_title are notably empty. Other cols like fuel_type and accident also contain some empty values
+
+
+```{r}
+cat(unique(data$accident), "\n")
+data$accident <- ifelse(data$accident == "At least 1 accident or damage reported", 1, 0)
+```
+Because accident only has 2 unique values, no accidents and 1 or more accidents, we changed it to 1,0 to be useful for models
+
+```{r}
+head(data$engine, 5)
+
+library(stringr)
+# Extract Horsepower (HP)
+data$horsepower <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=HP)"))
+
+# Extract Displacement
+data$displacement <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=L)"))
+
+# Extract Cylinders
+data$cylinders <- str_extract(data$engine, "\\d+ Cylinder")
+
+# Extract Engine Type
+data$engine_type <- str_extract(data$engine, "DOHC|SOHC|Turbo|Twin Turbo|Electric Motor")
+
+# Extract Fuel Type
+data$fuel_type <- str_extract(data$engine, "Gasoline|Diesel|Electric|Hybrid|Flex Fuel|Plug-In Electric/Gas")
+
+
+
+```
+
+```{r}
+cat(head(data$price, 5), "\n")
+data$price <- as.numeric(gsub("[$,]", "", data$price))
+```
+Removed the dollar sign and comma in price to enable numeric operations
+
+```{r}
+colnames(data)[colnames(data) == "milage"] <- "mileage"
+data$mileage <- as.numeric(gsub("[,]| mi\\.", "", data$mileage))
+```
+Updated the name of milage column to -> mileage. Removed mi. and , to enable numeric operations
+
+```{r}
+empty_space_rows <-  data[rowSums(data == "", na.rm = TRUE) > 0, ]
+print(empty_space_rows)
+cat("Empty Values:", nrow(empty_space_rows), "\n")
+```
+
+#summary statistics
+```{r}
+summary(data)
+```
+
+
 ## Unsupervised Learning 
 
 ## Prediction Models 
