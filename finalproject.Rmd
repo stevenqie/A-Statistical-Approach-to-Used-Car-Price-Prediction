@@ -1,13 +1,48 @@
 ---
 title: "A Statistical Approach to Used Car Price Prediction"
 output: pdf_document
-author: "Steven Qie(qie2), William Yeh(wy16), Brian Gong(brianhg2)"
-date: "2024-12-09"
+date: 12/09/2024
+header-includes:
+  - \usepackage{multicol}
+  - \usepackage{fancyvrb}
+  - \setlength{\columnsep}{1cm}
+  - \usepackage{geometry}
+  - \geometry{margin=1in}
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+\begin{multicols}{3}
+\setlength{\columnsep}{2pt}
+
+\begin{center}
+\textbf{Steven Qie} \\
+\textit{Statistics and Computer Science} \\
+\textit{University of Illinois Urbana-Champaign} \\
+\textbf{qie2@illinois.edu}
+\end{center}
+
+\columnbreak
+
+\begin{center}
+\textbf{Brian Gong} \\
+\textit{Statistics and Computer Science} \\
+\textit{University of Illinois Urbana-Champaign} 
+\textbf{brianhg2@illinois.edu}
+\end{center}
+
+\columnbreak
+
+\begin{center}
+\textbf{William Yeh} \\
+\textit{Statistics and Computer Science} \\
+\textit{University of Illinois Urbana-Champaign} 
+\textbf{wy16@illinois.edu}
+\end{center}
+
+\end{multicols}
 
 ## Introduction
 
@@ -17,38 +52,48 @@ This report aims to develop various predictive models for used car prices using 
 
 Need a section on key findings....
 
+
+
+Abstract— 
+
+white space 
+
+white space 
+
+white space 
+
+white space 
+
+white space 
+
+white space 
+
+white space 
+
+white space 
+
+white space 
+
 We utilized AI tools in this report to enhance and assist in our writing. These tools helped play a big role in ensuring clarity, conciseness, and professionalism. We also utilized AI tools to help us with syntax help when writing code in R, as well as discovering potential bugs in our code. 
 
-white space 
-
-white space 
-
-white space 
-
-white space 
-
-white space 
-
-white space 
-
-white space 
-
-white space 
-
-white space 
-
-white space 
-
-white space 
-
-white space 
-
-white space
 
 ## Literature Review 
-This literature review aims to summarize the main findings and approaches from a few noteworthy research papers focused on used car price prediction. 
+This literature review aims to summarize key findings and approaches from a few noteworthy research papers focused on used car price prediction. 
 
-The first paper of interest is "Price Prediction of Used Cars Using Machine Learning", written by Chuyang Jin of the University of Sydney. In his paper, he presented a model that can predict a used vehicle's price given certain conditions, as well as abilities to depict used vehicles' depreciation over the years. He hopes that his model can benefit and save time for both sellers and buyers selling or searching for second-hand vehicles in the market. By being able to depict the depreciation of used vehicles over the years, he hopes to help consumers decide which model to purchase if they plan to sell it in the future, as well as assist car manufacturers in determining which models should be produced more. Jin used a CSV dataset containing 100,000 records of used cars in the UK, focusing specifically on the Mercedes brand. The nine factors that he considered were the following: model, year, selling price, transmission, mileage, fuel type, tax, miles per gallon (mpg), and engine size. Notably, several problems started appearing immediately. The distribution of the various indicators was skewed. For example, the overwhelming majority of price falls in the 0-75,000 range, so there were not enough samples of used cars priced over 75,000 to be able to build an effective model. Jin tried various forms of regression, namely linear, polynomial, SVR, Decision Trees, and Random Forests, and discoevered that Random Forest Regression had the best R squared value. 
+"Price Prediction of Used Cars Using Machine Learning", written by Chuyang Jin of the University of Sydney, presents a model that can predict a used vehicle's price given their year of production, mileage, tax, miles per gallon, He hopes that his model can benefit and save time for both sellers and buyers who are looking to sell or serach for second-hand vehicles. Jin used a CSV dataset containing 100,000 records of used cars in the UK, focusing specifically on the Mercedes brand. The nine factors that he considered were the following: model, year, selling price, transmission, mileage, fuel type, tax, miles per gallon (mpg), and engine size. While doing exploratory data analysis and preprocessing, Jin noted that many many predictors had skewed distributions. For example, the overwhelming majority of prices fell in the 0-75,000 range, limiting the model's potential effectiveness for higher price ranges. Jin deemed these data points as outliers and excluded them to ensure that the model would be more accurate and usable. After testing various forms of regression, namely linear, polynomial, SVR, Decision Trees, and Random Forests, Jin found Random Forest Regression yielded the best R squared value of 0.90416. 
+
+"Used Car Price Prediction using Machine Learning: A Case Study", written by Mustapha Hankar, Marouane Birjali, and Abderrahim Beni-Hssane, applies several supervised machine learning algorithms to predict used car price prices based on features from a dataset collected from an online eCommerce website called Avito. During preprocessing, the authors of this paper performed recursive feature elimination to maintain only the most relevant features to car prices: year of manufacture, mileage, mark, fuel type, fiscal power, and model. Along with a baseline multiple linear regression model, the study also looked at K-nearest neighbors, Random Forest, Gradient Boosting, and Artificial Neural Networks. The study utilized 2 different performance metrics, R^2 and RMSE, and concluded that the Gradient Boosting Regression Model achieved the best results, with a R^2 of 0.8 and RMSE of 44516.20. 
+
+"Car Price Prediction using Supervised and Unsupervised Learning Models and Deep Learning" by Thomas Nsiah approached the problem of car price prediction from a supervised and unsupervised lenses. While supervised models allow a consumer to understand the key factors and predictors that influence pricing of used cars, unsupervised learning oftentimes uncovers hidden connections and patterns within the data. In his paper, Nsiah used a mock dataset of 50,000 UK second hand car sales with features similar to the previous 2 studies, such as model, engine size, fuel type, year, and mileage. Supervised learning models that Nsiah tried included simple linear regression, polynomial regression, and random forest, evaluated using mean absolute error (MAE) and R-squared metrics. He concluded that out of the supervised models, random forest performed best with an R-squared of 0.99849 and a MAE of 289.0691. For unsupervised learning techniques, Nsiah applied K-Means and DBSCAN clustering to identify price patterns, evaluated using the Davis Boudlin Index and the Silhouette Coefficient. He concluded that K-Means clustering for the year of manufacture vs price produced the best clustering results.
+
+Overall, these three studies demonstrate the effectiveness that machinie learning can have on accurately predicting used car prices. The next section will outline our own approach and findings.
+
+Citations: 
+
+- C. Jin, "Price Prediction of Used Cars Using Machine Learning," in 2021 IEEE International Conference on Emergency Science and Information Technology (ICESIT), Chongqing, China, 2021, pp. 223-230, doi: 10.1109/ICESIT53460.2021.9696839.
+- M. Hankar, M. Birjali, and A. Beni-Hssane, "Used Car Price Prediction using Machine Learning: A Case Study," in 2022 11th International Symposium on Signal, Image, Video and Communications (ISIVC), El Jadida, Morocco, 2022, pp. 1-4, doi: 10.1109/ISIVC54825.2022.9800719.
+- T. Nsiah, "Car Price Prediction using Supervised and Unsupervised Learning Models and Deep Learning," unpublished, 2024.
+
 
 ## Data Processing and Summary Statistics 
 
