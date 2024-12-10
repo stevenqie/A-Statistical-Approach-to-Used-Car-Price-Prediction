@@ -109,8 +109,9 @@ na_values <- data[!complete.cases(data), ]
 cat("NA Values:", nrow(na_values), "\n")
 empty_space_rows <-  data[rowSums(data == "", na.rm = TRUE) > 0, ]
 cat("Empty Values:", nrow(empty_space_rows), "\n")
+data[data == ""] <- NA
 ```
-Just looking at the data, some notable columns to do some preprocessing is accident,engine. Price and mileage can use some preprocessing to make into a number. Also, milage is spelled wrong. Although there seems to be no NA values, a lot of rows of clean_title are notably empty. Other cols like fuel_type and accident also contain some empty values
+Just looking at the data, some notable columns to do some preprocessing is accident,engine. Price and mileage can use some preprocessing to make into a number. Also, milage is spelled wrong. Although there seems to be no NA values, a lot of rows of clean_title are notably empty. Other cols like fuel_type and accident also contain some empty values. We turned empty values into NA values.
 
 
 ```{r}
@@ -173,24 +174,113 @@ pca_result <- prcomp(iris_data_scaled, center = TRUE, scale. = TRUE)
 
 ```
 
+
 ## Unsupervised Learning 
 Apply at least three clustering algorithms to the processed dataset.
 Determine the appropriate number of clusters and discuss the interpretability of these clusters. Do they hold any meaningful distinctions?
 Examine whether the clustering results are associated with your outcome variable.
+
 1. KMeans Clustering 
 ```{r}
-set.seed(1)
-
-usedcars.kmean <- kmeans(data[, -ncol(data)])
+data_subset <- data[, c("model_year", "price")]
+data_subset <- na.omit(data_subset)
+data <- scale(data_subset)
 ```
+We decided to use kmeans to examine the relation between model_year and price, as we noticed a similar examination in one of the papers while doing the literature review
+
+```{r}
+
+library(cluster)
+set.seed(1)
+# Compute silhouette scores for k = 2 to 10
+sil_scores <- sapply(2:10, function(k) {
+  km <- kmeans(scale(data_subset[, c("model_year", "price")]), centers = k, nstart = 10)
+  silhouette(km$cluster, dist(scale(data_subset[, c("model_year", "price")]))) %>%
+    summary() %>%
+    .$avg.width
+})
+# Plot silhouette scores
+plot(2:10, sil_scores, type = "b", pch = 19, frame = FALSE,
+     xlab = "Number of Clusters (k)",
+     ylab = "Average Silhouette Score",
+     main = "Silhouette Method for Optimal k")
+
+```
+
+
+```{r}
+library(ggplot2)
+set.seed(1)  
+
+
+kmeans_result <- kmeans(data_subset_scaled, centers = 4)
+
+# Add cluster assignments to the original data
+data_subset$cluster <- as.factor(kmeans_result$cluster)
+
+# Visualize the clusters
+ggplot(data_subset, aes(x = model_year, y = price, color = cluster)) +
+  geom_point(size = 2) +
+  labs(title = "K-Means Clustering on Model Year vs Price",
+       x = "Model Year",
+       y = "Price") +
+  theme_minimal()
+
+
+```
+Two notable things:
+1. There are a couple huge outliers in the price department that is taking up its own cluster
+2.The rest of the clusters (2,3,4) are clearly separated by year ranges. There is a slightly higher range/variation in price in the most recent year range, so there may be a weak relationship between a more recent model_year and higher price
+
+
 
 2. Hierarchical Clustering 
 
 Next, we will try hierarchical clustering with three different linkage methods(single, complete, and average) using euclidean distance. Hierarchical Clustering begins with each data point starting as its own cluster. The goal is to progressively group them together until there is only one group. The process involves choosing the closest two groups, calculated through a specific distance metric. 
 ```{r}
-hclust_simple <- hclust(dist(train[, -ncol(data)], method="euclidean"), method = "single")
-hclust_complete <- hclust(dist(train[, -ncol(data)], method = "euclidean"), method = "complete")
-hclust_average <- hclust(dist(train[, -ncol(data)], method = "euclidean"), method = "average")
+library(stats)
+set.seed(1)
+numeric_data <- data[, sapply(data, is.numeric)]
+numeric_data_without_price <- numeric_data[, !colnames(numeric_data) %in% "price"]
+
+hclust_single <- hclust(dist(numeric_data_without_price, method = "euclidean"), method = "single")
+hclust_complete <- hclust(dist(numeric_data_without_price, method = "euclidean"), method = "complete")
+hclust_average <- hclust(dist(numeric_data_without_price, method = "euclidean"), method = "average")
+
+par(mfrow = c(1, 3))
+plot(hclust_single, main = "Single Linkage", xlab = "", sub = "", cex = 0.6)
+plot(hclust_complete, main = "Complete Linkage", xlab = "", sub = "", cex = 0.6)
+plot(hclust_average, main = "Average Linkage", xlab = "", sub = "", cex = 0.6)
+par(mfrow = c(1, 1))
+
+```
+
+```{r}
+
+clusters_complete <- cutree(hclust_complete, k = 4)
+
+
+data$cluster <- as.factor(clusters_complete)
+
+
+table(data$cluster)
+library(dplyr)
+
+cluster_summary <- data %>%
+  group_by(cluster) %>%
+  summarise(
+    avg_price = mean(price, na.rm = TRUE),
+    avg_model_year = mean(model_year, na.rm = TRUE),
+    avg_accident = mean(as.numeric(accident), na.rm = TRUE),  # Replace with proper numeric conversion if needed
+    avg_mileage = mean(mileage, na.rm = TRUE),
+    avg_horsepower = mean(horsepower, na.rm = TRUE),
+    count = n()
+  )
+
+# Print the cluster summary
+print(cluster_summary)
+
+
 ```
 
 
