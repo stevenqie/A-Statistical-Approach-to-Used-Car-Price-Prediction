@@ -97,12 +97,19 @@ Citations:
 
 ## Data Processing and Summary Statistics 
 
-First, let's import the data into our workspace
+First, we will import the dataset and libraries into our workspace 
 ```{r}
+library(caret)
+library(ggplot2)
+library(MASS)
+library(randomForest)
+library(kernlab)
+library(stringr)
+library(glmnet)
 data <- read.csv("used_cars.csv")
 ```
 
-quick overview of data
+Quick overview of data
 ```{r}
 head(data)
 na_values <- data[!complete.cases(data), ]
@@ -123,7 +130,6 @@ Because accident only has 2 unique values, no accidents and 1 or more accidents,
 ```{r}
 head(data$engine, 5)
 
-library(stringr)
 # Extract Horsepower (HP)
 data$horsepower <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=HP)"))
 
@@ -164,16 +170,6 @@ cat("Empty Values:", nrow(empty_space_rows), "\n")
 ```{r}
 summary(data)
 ```
-
-##performing pca 
-```{r}
-library(ggplot2)
-data_scaled <- scale(data)
-
-pca_result <- prcomp(iris_data_scaled, center = TRUE, scale. = TRUE)
-
-```
-
 
 ## Unsupervised Learning 
 Apply at least three clustering algorithms to the processed dataset.
@@ -290,21 +286,16 @@ Finally, we will try spectral clustering, which aims to group observations based
 
 ```{r}
 set.seed(1)
-library(kernlab)
 specc_result <- specc(as.matrix(train[, -1]), centers = 3, kernel = "rbfdot")
 ```
 
 
 ## Prediction Models 
-Implement at least five different regression models to predict the price and tune their parameters appropriately.
-You may use models beyond those covered in this course. However, at least four models should be ones introduced in class. If you incorporate a new model, provide a detailed description of it.
-All linear models (e.g., OLS) and penalized linear models (Lasso, Ridge, Elastic Net) will be treated as the same model. KNN and Nadaraya-Watson kernel estimators are treated as the same model. If you use KNN or NW Kernel Estimators, you should discuss what distance metric is used, especially for the categorical variables.
-Tune each model carefully, and clearly explain the tuning process for each. State your evaluation criteria and, if multiple criteria are used, discuss their advantages and disadvantages.
-Provide sufficient information, including tables, figures, and explanations, to illustrate the model-fitting results. Which model appears to perform best?
-Identify the variable(s) you constructed that seem to be most predictive, and provide interpretations of their impact on the model.
 
-First, we are going to split our data into training and testing datasets. 
+For all the supervised models below, we will split the data into training sets for model training and testing sets to evaluate performance and accuracy
 ```{r}
+y = data$price
+X = data.matrix(cbind(1, data[, setdiff(names(data), "price")]))
 test_idx = sample(nrow(data), size = 0.2 * nrow(data))
 trainx = X[ -test_idx, ]
 testx  = X[ test_idx, ]
@@ -312,17 +303,101 @@ trainy = y[ -test_idx ]
 testy  = y[ test_idx ]
 ```
 
-1. Linear Model. We will be using elastic net regression, which is 
-```{r}
-lm_model <- lm(train_labels ~ ., data = as.data.frame(train_data))
+1. Linear Model. There are mainly three possible linear models: Lasso, Ridge, and Elastic Net. We will try all three models and see which one performs the best. Lasso, Ridge, and Elastic Net all benefit from feature scaling because these models involve regularization. which will penalize the size of coefficients of the model to avoid overfitting. All 3 models also involving a tuning parameter, and so we will use k-fold cross validation to find the best parameters. 
 
-# Make predictions on the test set
-lm_predictions <- predict(lm_model, newdata = as.data.frame(test_data))
+```{r}
+set.seed(1)
+#feature scale the data 
+xtrain_scaled <- scale(xtrain_copy)  # Scale the training feature data
+xtest_scaled <- scale(xtest_copy, center = attr(xtrain_scaled, "scaled:center"), 
+                      scale = attr(xtrain_scaled, "scaled:scale"))  # Apply same scaling to test data
 ```
-2. KNN 
+
+Setup for Kfold Cross Validation 
+```{r}
+train_control <- trainControl(method = "cv", number = 10)  # 10-fold cross-validation
+# For Lasso (alpha = 1)
+lasso_grid <- expand.grid(alpha = 1, lambda = seq(0.01, 1, by = 0.01))
+
+# For Ridge (alpha = 0)
+ridge_grid <- expand.grid(alpha = 0, lambda = seq(0.01, 1, by = 0.01))
+
+# For Elastic Net (alpha between 0 and 1)
+elastic_net_grid <- expand.grid(alpha = seq(0, 1, by = 0.1), lambda = seq(0.01, 1, by = 0.01))
+```
+
+Training our 3 models 
+```{r}
+lasso_model <- train(x = Xtrain, y = ytrain, method = "glmnet",
+                     trControl = train_control, tuneGrid = lasso_grid)
+
+ridge_model <- train(x = Xtrain, y = ytrain, method = "glmnet",
+                     trControl = train_control, tuneGrid = ridge_grid)
+
+elastic_net_model <- train(x = Xtrain, y = ytrain, method = "glmnet", trControl = train_control, tuneGrid = elastic_net_grid)
+
+```
+
+Finding the best tuning parameters for all of them 
+```{r}
+print(paste("Best tuning parameter for Lasso: ", lasso_model$bestTune))
+print(paste("Best tuning parameters for Ridge:", ridge_model$bestTune))
+print(paste("Best tuning parameters for Elastic Net:", elastic_net_model$bestTune))
+```
+
+Predict on our test set and find prediction error 
+```{r}
+lasso_pred <- predict(lasso_model, Xtest)
+ridge_pred <- predict(ridge_model, Xtest)
+elastic_net_pred <- predict(elastic_net_model, Xtest)
+
+print(paste("Lasso model prediction error:", mean((lasso_pred - ytest)^2)))
+print(paste("Ridge model prediction error:", mean((ridge_pred - ytest)^2)))
+print(paste("Elastic net prediction error: ", mean((elastic_net_pred - ytest)^2)))
+```
+Out of our 3 linear models, ... performed the best 
+
+
+2. K Nearest Neighbors(KNN) regression works by calculating the k nearest training set data points to the test point and predicting the target value by taking the average of their target values. KNN is sensitive to feature scaling, so we will need to scale the data. The reason behind this is for example, if one feature has ranges from 1-10 and another one has 1-10000, distance calcualtions will be biased and results will suffer as a result. KNN is also sensitive to the choice of k. To find the optimal value of k, we will perform k-fold cross validation. 
+
+```{r}
+# feature scale- scale only the numerical columns 
+scaled_data = copy(as.data.table(data))
+numerical_cols <- sapply(scaled_data, is.numeric)
+scaled_data[numerical_cols] <- scale(scaled_data[numerical_cols])
+```
+
+```{r}
+#use scaled data 
+#train knn algorithm and perform k fold cross validation
+control <- trainControl(method = "cv", number = 10)
+knn.cvfit <- train(y ~ ., method = "knn", 
+                     data = data.frame(xtrain_scaled, ytrain,
+                     tuneGrid = data.frame(k = seq(1, 40, 1)),
+                     trControl = control)
+# Plot the cross-validation results to visualize performance
+plot(knn_model)
+
+#plot k vs regression error 
+plot(knn.cvfit$results$k, 1-knn.cvfit$results$Accuracy,
+     xlab = "K", ylab = "Classification Error", type = "b",
+     pch = 19, col = "darkorange")
+
+print(paste("The best value of k based on cross-validation is: ", knn_model$bestTune))
+```
+
+```{r}
+# Train the final model using the best value of k and find the predictions
+best_k <- knn_model$bestTune$k
+knn_predictions <- knn(train = xtrain_scaled, test = xtest_scaled, cl = ytrain, k = best_k)
+
+# Calculate prediction error 
+print(paste("Prediction errort: ", mean((as.numeric(knn_predictions) - ytest)^2)))
+```
+
+
 3. Random Forest 
 ```{r}
-library(randomForest)
 rf_model <- randomForest(train_labels ~ ., data = as.data.frame(train_data))
 
 rf_predictions <- predict(rf_model, newdata = as.data.frame(test_data))
