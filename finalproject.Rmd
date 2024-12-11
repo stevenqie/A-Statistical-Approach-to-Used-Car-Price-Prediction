@@ -105,34 +105,23 @@ library(MASS)
 library(randomForest)
 library(kernlab)
 library(stringr)
+library(cluster)
 library(glmnet)
+library(stats)
+library(dplyr)
 data <- read.csv("used_cars.csv")
 ```
 
-Quick overview of data
+#Preliminary Data Cleaning/Modifications
+First, we will removed the dollar sign and comma in price to enable numeric operations
 ```{r}
-head(data)
-na_values <- data[!complete.cases(data), ]
-cat("NA Values:", nrow(na_values), "\n")
-empty_space_rows <-  data[rowSums(data == "", na.rm = TRUE) > 0, ]
-cat("Empty Values:", nrow(empty_space_rows), "\n")
-data[data == ""] <- NA
+#cat(head(data$price, 5), "\n")
+data$price <- as.numeric(gsub("[$,]", "", data$price))
 ```
-Just looking at the data, some notable columns to do some preprocessing is accident,engine. Price and mileage can use some preprocessing to make into a number. Also, milage is spelled wrong. Although there seems to be no NA values, a lot of rows of clean_title are notably empty. Other cols like fuel_type and accident also contain some empty values. We turned empty values into NA values.
 
-
+The Engine columns contains very useful information such as the horsepower, displacement, cylinders, engine type, and fuel type. We turn these all into new columns. 
 ```{r}
-cat(unique(data$accident), "\n")
-data$accident <- ifelse(data$accident == "At least 1 accident or damage reported", 1, 0)
-
-cat(unique(data$clean_title), "\n")
-data$clean_title <-ifelse(data$clean_title == "Yes", 1, 0)
-data$clean_title[is.na(data$clean_title)] <- 0
-head(data)
-```
-Because accident only has 2 unique values, no accidents and 1 or more accidents, we changed it to 1,0 to be useful for models. We apply similar reasoning to clean_title. Since there is only "Yes" and NA, we treat all the yes's to 1 and all the NA values to 0.
-```{r}
-head(data$engine, 5)
+#head(data$engine, 5)
 
 # Extract Horsepower (HP)
 data$horsepower <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=HP)"))
@@ -154,39 +143,125 @@ data$fuel_type <- str_extract(data$engine, "Gasoline|Diesel|Electric|Hybrid|Flex
 # factor fuel type
 data$fuel_type_factor <- factor(data$fuel_type)
 data$fuel_type_numeric <- as.numeric(data$fuel_type_factor)
+
+#deleting the engine column because we have extracted all the information 
+data$engine = NULL
+#colnames(data)
 ```
 
-```{r}
-cat(head(data$price, 5), "\n")
-data$price <- as.numeric(gsub("[$,]", "", data$price))
-```
-Removed the dollar sign and comma in price to enable numeric operations
-
+Corrected the spelling of mileage from milage to mileage. Removed mi. and , to enable numeric operations
 ```{r}
 colnames(data)[colnames(data) == "milage"] <- "mileage"
 data$mileage <- as.numeric(gsub("[,]| mi\\.", "", data$mileage))
 ```
-Updated the name of milage column to -> mileage. Removed mi. and , to enable numeric operations
+
+
+#Analyzing Null/Empty Values 
+We will first look at the problem with NA and Empty values, something that this dataset has a lot of. We will first handle both NA and Empty "" values by replacing them to "NA" to make it easier to preprocess and analyze.  
+```{r}
+na_columns <- colSums(is.na(data)) > 0
+empty_string_columns <- colSums(data == "") > 0
+columns_with_na_or_empty <- na_columns | empty_string_columns
+print(names(data)[columns_with_na_or_empty])
+
+data[data == "" | is.na(data)] <- "NA"
+```
+There are three columns with empty strings/NA values. Let's examine all three of them to discover if we can find any patterns. 
+
+```{r}
+result <- data %>%
+  group_by(fuel_type) %>%
+  summarise(
+    medianprice = median(price),
+    averageprice = mean(price),
+    count = n()
+  )
+print(result)
+```
+The NA values for fuel_type have a higher median price and average price than other types, and makes up a significant count of observations so we are going to treat it as a separate category.
+
+```{r}
+result <- data %>%
+  group_by(accident) %>%
+  summarise(
+    medianprice = median(price),
+    averageprice = mean(price),
+    count = n()
+  )
+print(result)
+```
+The NA/Empty values for accident exhibit very similar properties to the None reported category, with median price and average price being pretty similar, not to mention a very small percentage of data is represented by this value. Therefore, we replace and combine these observations with the None reported category. Because accident only has 2 unique values now, no accidents and 1 or more accidents, we changed it to 1,0 to be useful for models. 
+```{r}
+data$accident[data$accident == "NA"] <- "None reported"
+#unique(data$accident)
+data$accident <- ifelse(data$accident == "At least 1 accident or damage reported", 1, 0)
+#unique(data$accident)
+```
+
+```{r}
+result <- data %>%
+  group_by(clean_title) %>%
+  summarise(
+    medianprice = median(price),
+    averageprice = mean(price),
+    count = n()
+  )
+print(result)
+```
+
+The NA values for clean_title clearly have a significantly higher median price and will be treated as a separate category. We apply similar reasoning from accident to clean_title. Since there is only "Yes" and NA, we treat all the yes's to 1 and all the NA values to 0.
+```{r}
+data$clean_title <-ifelse(data$clean_title == "Yes", 1, 0)
+unique(data$clean_title)
+```
+
+#Removing Outliers 
+```{r}
+Q1 <- quantile(data$price, 0.25, na.rm = TRUE)
+Q3 <- quantile(data$price, 0.75, na.rm = TRUE)
+IQR_value <- IQR(data$price, na.rm = TRUE)
+
+# Identify outliers using IQR
+lower_bound <- Q1 - 1.5 * IQR_value
+upper_bound <- Q3 + 1.5 * IQR_value
+
+outliers <- data[data$price < lower_bound | data$price > upper_bound, ]
+print(paste("Number of outliers: ", nrow(outliers), "and average price of these cars: ", round(mean(outliers$price), 2)))
+      
+#removing these rows from the dataset
+data <- data[!(data$price < lower_bound | data$price > upper_bound), ]
+```
+
+#need feature idengtifrication and analysis for categorical and numerical variables 
+#One hot encoding for our categorical variables 
+```{r}
+table(data$fuel_type)
+```
+
+LEFTOVER of brians stuff
+```{r}
+head(data)
+na_values <- data[!complete.cases(data), ]
+cat("NA Values:", nrow(na_values), "\n")
+empty_space_rows <-  data[rowSums(data == "", na.rm = TRUE) > 0, ]
+cat("Empty Values:", nrow(empty_space_rows), "\n")
+data[data == ""] <- NA
+```
+Just looking at the data, some notable columns to do some preprocessing is accident,engine. Price and mileage can use some preprocessing to make into a number. Also, milage is spelled wrong. Although there seems to be no NA values, a lot of rows of clean_title are notably empty. Other cols like fuel_type and accident also contain some empty values. We turned empty values into NA values.
 
 ```{r}
 empty_space_rows <-  data[rowSums(data == "", na.rm = TRUE) > 0, ]
 cat("Empty Values:", nrow(empty_space_rows), "\n")
 ```
+END OF LEFTOVER BRIANS STUFF 
 
-#summary statistics
+#Final Summary Statistics
 ```{r}
 summary(data)
 ```
 
-## numeric data
-
-```{r}
-datan <- data[c("model_year", "mileage", "accident", "clean_title", "horsepower", "displacement", "cylinders_numeric", "fuel_type_numeric", "price")]
-summary(datan)
-colSums(is.na(datan))
-```
-## pca 
-
+## pca?
+WILLY STUFF???
 ```{r}
 # remove null values
 data_cleaned <- na.omit(datan) # almost 1000
@@ -217,6 +292,7 @@ plot(scores[, 1], scores[, 2],
 # pca_result <- prcomp(clean_no_price, center = TRUE, scale. = TRUE)
 
 ```
+END OF WILLY STUFF?
 
 ## Unsupervised Learning 
 Apply at least three clustering algorithms to the processed dataset.
@@ -232,8 +308,6 @@ data <- scale(data_subset)
 We decided to use kmeans to examine the relation between model_year and price, as we noticed a similar examination in one of the papers while doing the literature review
 
 ```{r}
-
-library(cluster)
 set.seed(1)
 # Compute silhouette scores for k = 2 to 10
 sil_scores <- sapply(2:10, function(k) {
@@ -252,7 +326,6 @@ plot(2:10, sil_scores, type = "b", pch = 19, frame = FALSE,
 
 
 ```{r}
-library(ggplot2)
 set.seed(1)  
 
 
@@ -281,7 +354,6 @@ Two notable things:
 
 Next, we will try hierarchical clustering with three different linkage methods(single, complete, and average) using euclidean distance. Hierarchical Clustering begins with each data point starting as its own cluster. The goal is to progressively group them together until there is only one group. The process involves choosing the closest two groups, calculated through a specific distance metric. 
 ```{r}
-library(stats)
 set.seed(1)
 numeric_data <- data[, sapply(data, is.numeric)]
 numeric_data_without_price <- numeric_data[, !colnames(numeric_data) %in% "price"]
@@ -307,7 +379,6 @@ data$cluster <- as.factor(clusters_complete)
 
 
 table(data$cluster)
-library(dplyr)
 
 cluster_summary <- data %>%
   group_by(cluster) %>%
@@ -338,16 +409,18 @@ specc_result <- specc(as.matrix(train[, -1]), centers = 3, kernel = "rbfdot")
 
 
 ## Prediction Models 
-
+```{r}
+head(data)
+```
 For all the supervised models below, we will split the data into training sets for model training and testing sets to evaluate performance and accuracy
 ```{r}
 y = data$price
 X = data.matrix(cbind(1, data[, setdiff(names(data), "price")]))
 test_idx = sample(nrow(data), size = 0.2 * nrow(data))
-trainx = X[ -test_idx, ]
-testx  = X[ test_idx, ]
-trainy = y[ -test_idx ]
-testy  = y[ test_idx ]
+xtrain = X[ -test_idx, ]
+xtest  = X[ test_idx, ]
+ytrain = y[ -test_idx ]
+ytest  = y[ test_idx ]
 ```
 
 1. Linear Model. There are mainly three possible linear models: Lasso, Ridge, and Elastic Net. We will try all three models and see which one performs the best. Lasso, Ridge, and Elastic Net all benefit from feature scaling because these models involve regularization. which will penalize the size of coefficients of the model to avoid overfitting. All 3 models also involving a tuning parameter, and so we will use k-fold cross validation to find the best parameters. 
@@ -355,33 +428,26 @@ testy  = y[ test_idx ]
 ```{r}
 set.seed(1)
 #feature scale the data 
-xtrain_scaled <- scale(xtrain_copy)  # Scale the training feature data
-xtest_scaled <- scale(xtest_copy, center = attr(xtrain_scaled, "scaled:center"), 
-                      scale = attr(xtrain_scaled, "scaled:scale"))  # Apply same scaling to test data
+xtraincopy <- xtrain 
+xtestcopy <- xtest
+xtrain_scaled <- scale(xtraincopy)  
+xtest_scaled <- scale(xtestcopy, center = attr(xtrain_scaled, "scaled:center"), scale = attr(xtrain_scaled, "scaled:scale"))
 ```
 
-Setup for Kfold Cross Validation 
+Setup for k-fold Cross Validation 
 ```{r}
 train_control <- trainControl(method = "cv", number = 10)  # 10-fold cross-validation
-# For Lasso (alpha = 1)
+
 lasso_grid <- expand.grid(alpha = 1, lambda = seq(0.01, 1, by = 0.01))
-
-# For Ridge (alpha = 0)
 ridge_grid <- expand.grid(alpha = 0, lambda = seq(0.01, 1, by = 0.01))
-
-# For Elastic Net (alpha between 0 and 1)
 elastic_net_grid <- expand.grid(alpha = seq(0, 1, by = 0.1), lambda = seq(0.01, 1, by = 0.01))
 ```
 
 Training our 3 models 
 ```{r}
-lasso_model <- train(x = Xtrain, y = ytrain, method = "glmnet",
-                     trControl = train_control, tuneGrid = lasso_grid)
-
-ridge_model <- train(x = Xtrain, y = ytrain, method = "glmnet",
-                     trControl = train_control, tuneGrid = ridge_grid)
-
-elastic_net_model <- train(x = Xtrain, y = ytrain, method = "glmnet", trControl = train_control, tuneGrid = elastic_net_grid)
+lasso_model <- train(x = xtrain_scaled, y = ytrain, method = "glmnet", trControl = train_control, tuneGrid = lasso_grid)
+ridge_model <- train(x = xtrain_scaled, y = ytrain, method = "glmnet", trControl = train_control, tuneGrid = ridge_grid)
+elastic_net_model <- train(x = xtrain_scaled, y = ytrain, method = "glmnet", trControl = train_control, tuneGrid = elastic_net_grid)
 
 ```
 
@@ -408,14 +474,15 @@ Out of our 3 linear models, ... performed the best
 2. K Nearest Neighbors(KNN) regression works by calculating the k nearest training set data points to the test point and predicting the target value by taking the average of their target values. KNN is sensitive to feature scaling, so we will need to scale the data. The reason behind this is for example, if one feature has ranges from 1-10 and another one has 1-10000, distance calcualtions will be biased and results will suffer as a result. KNN is also sensitive to the choice of k. To find the optimal value of k, we will perform k-fold cross validation. 
 
 ```{r}
-# feature scale- scale only the numerical columns 
-scaled_data = copy(as.data.table(data))
-numerical_cols <- sapply(scaled_data, is.numeric)
-scaled_data[numerical_cols] <- scale(scaled_data[numerical_cols])
+set.seed(1)
+# feature scale 
+xtraincopy <- xtrain 
+xtestcopy <- xtest
+xtrain_scaled <- scale(xtraincopy)  
+xtest_scaled <- scale(xtestcopy, center = attr(xtrain_scaled, "scaled:center"), scale = attr(xtrain_scaled, "scaled:scale"))
 ```
 
 ```{r}
-#use scaled data 
 #train knn algorithm and perform k fold cross validation
 control <- trainControl(method = "cv", number = 10)
 knn.cvfit <- train(y ~ ., method = "knn", 
@@ -427,7 +494,7 @@ plot(knn_model)
 
 #plot k vs regression error 
 plot(knn.cvfit$results$k, 1-knn.cvfit$results$Accuracy,
-     xlab = "K", ylab = "Classification Error", type = "b",
+     xlab = "K", ylab = "Regression Error", type = "b",
      pch = 19, col = "darkorange")
 
 print(paste("The best value of k based on cross-validation is: ", knn_model$bestTune))
