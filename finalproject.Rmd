@@ -460,23 +460,6 @@ We remove outliers with 1.5*IQR value.
 #need feature idengtifrication and analysis for categorical and numerical variables 
 #One hot encoding for our categorical variables 
 
-LEFTOVER of brians stuff
-```{r}
-head(data)
-na_values <- data[!complete.cases(data), ]
-cat("NA Values:", nrow(na_values), "\n")
-empty_space_rows <-  data[rowSums(data == "", na.rm = TRUE) > 0, ]
-cat("Empty Values:", nrow(empty_space_rows), "\n")
-data[data == ""] <- NA
-```
-Just looking at the data, some notable columns to do some preprocessing is accident,engine. Price and mileage can use some preprocessing to make into a number. Also, milage is spelled wrong. Although there seems to be no NA values, a lot of rows of clean_title are notably empty. Other cols like fuel_type and accident also contain some empty values. We turned empty values into NA values.
-
-```{r}
-empty_space_rows <-  data[rowSums(data == "", na.rm = TRUE) > 0, ]
-cat("Empty Values:", nrow(empty_space_rows), "\n")
-```
-END OF LEFTOVER BRIANS STUFF 
-
 #Final Summary Statistics
 ```{r}
 dim(data)
