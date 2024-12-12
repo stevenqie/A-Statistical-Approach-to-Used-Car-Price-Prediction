@@ -483,43 +483,6 @@ dim(data)
 summary(data)
 ```
 
-## pca?
-WILLY STUFF
-```{r}
-datan <- data[c("model_year", "mileage", "accident", "clean_title", "horsepower", "displacement", "cylinders_factor", "fuel_type_factor", "price")]
-summary(datan)
-colSums(is.na(datan))
-# remove null values but there should be none
-data_cleaned <- na.omit(datan) # almost 1000
-head(data_cleaned)
-dim(data_cleaned)
-
-# remove price response var
-clean_no_price <- within(data_cleaned, rm("price"))
-head(clean_no_price)
-dim(clean_no_price)
-
-# scale 
-data_scaled <- scale(clean_no_price)
-# pca fit, try princomp or prcomp
-pcafit <- princomp(clean_no_price)
-pcafit
-
-scores <- pcafit$scores
-
-scores
-
-plot(scores[, 1], scores[, 2], 
-     xlab = "Principal Component 1", 
-     ylab = "Principal Component 2", 
-     main = "PCA: First Two Components",
-     col = "blue", pch = 20)
-
-# pca_result <- prcomp(clean_no_price, center = TRUE, scale. = TRUE)
-
-```
-END OF WILLY STUFF
-
 ## Unsupervised Learning 
 Apply at least three clustering algorithms to the processed dataset.
 Determine the appropriate number of clusters and discuss the interpretability of these clusters. Do they hold any meaningful distinctions?
