@@ -109,7 +109,6 @@ library(cluster)
 library(glmnet)
 library(stats)
 library(dplyr)
-library(class)
 data <- read.csv("used_cars.csv")
 ```
 
@@ -125,37 +124,177 @@ The Engine columns contains very useful information such as the horsepower, disp
 #head(data$engine, 5)
 
 # Extract Horsepower (HP)
-#data$horsepower <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=HP)"))
+data$horsepower <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=HP)"))
 
 # Extract Displacement
-#data$displacement <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=L)"))
+data$displacement <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=L)"))
 
 # Extract Cylinders
-#data$cylinders <- str_extract(data$engine, "\\d+ Cylinder")
+data$cylinders <- str_extract(data$engine, "\\d+ Cylinder")
 
-#data$cylinders_numeric <- as.numeric(str_extract(data$cylinders, "\\d+"))
+data$cylinders_factor <- factor(str_extract(data$cylinders, "\\d+"))
 
 # Extract Engine Type
-#data$engine_type <- str_extract(data$engine, "DOHC|SOHC|Turbo|Twin Turbo|Electric Motor")
+data$engine_type <- str_extract(data$engine, "DOHC|SOHC|Turbo|Twin Turbo|Electric Motor")
 
 # Extract Fuel Type
-#data$fuel_type <- str_extract(data$engine, "Gasoline|Diesel|Electric|Hybrid|Flex Fuel|Plug-In Electric/Gas")
+data$fuel_type <- str_extract(data$engine, "Gasoline|Diesel|Electric|Hybrid|Flex Fuel|Plug-In Electric/Gas")
 
 # factor fuel type
-#data$fuel_type_factor <- factor(data$fuel_type)
-#data$fuel_type_numeric <- as.numeric(data$fuel_type_factor)
+data$fuel_type_factor <- factor(data$fuel_type)
 
+# Add <NA> as a valid level in factor types
+data$fuel_type_factor <- addNA(data$fuel_type_factor)
+data$cylinders_factor <- addNA(data$cylinders_factor)
+
+# Rename the <NA> level to "NA"
+levels(data$fuel_type_factor)[is.na(levels(data$fuel_type_factor))] <- "NA"
+levels(data$cylinders_factor)[is.na(levels(data$cylinders_factor))] <- "NA"
+
+data$fuel_type_numeric <- as.numeric(data$fuel_type_factor)
+data$cylinders_numeric <- as.numeric(data$cylinders_factor)
+
+# numeric value assigned:fuel_type_factor (to get it back)
+fuel_type_mapping <- setNames(
+  levels(data$fuel_type_factor),
+  unique(data$fuel_type_numeric)
+)
+
+# numeric value assigned:cylinder_factor
+cylinders_mapping <- setNames(
+  1:length(levels(data$cylinders_factor)),
+  levels(data$cylinders_factor)
+)
+
+unique(data$fuel_type_numeric)
+fuel_type_mapping
+cylinders_mapping
 #deleting the engine column because we have extracted all the information 
-#data$engine = NULL
-#colnames(data)
+data$engine = NULL
+# colnames(data)
 ```
 
-Corrected the spelling of mileage from milage to mileage. Removed mi. and , to enable numeric operations
+Corrected the spelling of mileage from milage to mileage. Removed mi. and , to enable numeric operations. Renamed transmission to transmission_ for readability of one hot encoded dummy variables later.
 ```{r}
 colnames(data)[colnames(data) == "milage"] <- "mileage"
 data$mileage <- as.numeric(gsub("[,]| mi\\.", "", data$mileage))
 ```
 
+#Analyzing categorical variables
+
+```{r}
+# num model and num brand are too large so will just omit 
+length(table(data$brand)) # 57
+length(unique(data$model))
+length(unique(data$transmission)) # 61
+
+# calculate the counts for brand
+brandcounts <- table(data$brand)
+
+barplot(brandcounts,
+  main = "Histogram of brand",
+  xlab = "brand",
+  ylab = "Count",
+  col = "skyblue",
+  las = 2) 
+
+# calculate the counts for transmission
+trancounts <- table(data$transmission)
+
+barplot(trancounts,
+  main = "Histogram of transmission",
+  xlab = "transmission",
+  ylab = "Count",
+  col = "skyblue",
+  las = 2) 
+```
+
+```{r}
+result <- data %>%
+  group_by(transmission) %>%
+  summarise(
+    medianprice = median(price),
+    averageprice = mean(price),
+    count = n()
+  )
+result_sorted <- result %>%
+  arrange(desc(count))
+print(result_sorted)
+threshold <- quantile(result_sorted$count, 0.9) # 205.7
+significant_transmissions <- result_sorted$transmission[result_sorted$count > threshold]
+print(significant_transmissions)
+```
+
+# One-hot encoding categorical variables 
+
+After looking at histograms for both Brand and Transmission, it seems Brand is more uniformly distributed while Transmission has a few salient categories. After exploring the categories of transmissions we found that the top 7 most frequent transmissions account for approximately 67-70% of the data points. Therefore we will one hot encode these 7 categories + an "Other" category for Transmission for a total of 8 transmission categories. We will also one hot encode "fuel type" and "cylinders" since those are categorical variables as well.
+
+## Transmission
+Transmission, fuel_type, cylinders 
+
+```{r}
+# map transmissions to just the top 7 or Other. could make this function take in significant_transmissions too for extensibility
+map_transmission <- function(transmission) {
+  primary_transmissions <- c(
+    "A/T", 
+    "8-Speed A/T", 
+    "Transmission w/Dual Shift Mode", 
+    "6-Speed A/T", 
+    "6-Speed M/T", 
+    "Automatic", 
+    "7-Speed A/T"
+  )
+  
+  if (transmission %in% primary_transmissions) {
+    return(transmission)
+  } else {
+    return("Other")
+  }
+}
+
+# Apply the mapping function
+data$transmission <- sapply(data$transmission, map_transmission)
+
+# One-hot encoding
+transmission_dummies <- model.matrix(~ transmission - 1, data = data)
+transmission_dummies <- as.data.frame(transmission_dummies)
+
+colnames(transmission_dummies) <- gsub("transmission", "transmission type: ", colnames(transmission_dummies))
+
+# summary(transmission_dummies)
+
+# Add the dummy columns to the original dataframe
+data <- cbind(data, transmission_dummies)
+
+# factor transmission as well
+
+data$transmission_factored <- factor(data$transmission)
+```
+
+## cylinders
+```{r}
+# One-hot encoding
+cyl_dummies <- model.matrix(~ cylinders_factor - 1, data = data)
+cyl_dummies <- as.data.frame(cyl_dummies)
+
+colnames(cyl_dummies) <- gsub("cylinders_factor", "cylinder number ", colnames(cyl_dummies))
+
+# summary(cyl_dummies)
+
+data <- cbind(data, cyl_dummies)
+```
+
+## fuel_type
+
+```{r}
+# One-hot encoding
+fuel_dummies <- model.matrix(~ fuel_type_factor - 1, data = data)
+fuel_dummies <- as.data.frame(fuel_dummies)
+
+colnames(fuel_dummies) <- gsub("fuel_type_factor", "fuel type ", colnames(fuel_dummies))
+
+data <- cbind(data, fuel_dummies)
+```
 
 #Analyzing Null/Empty Values 
 We will first look at the problem with NA and Empty values, something that this dataset has a lot of. We will first handle both NA and Empty "" values by replacing them to "NA" to make it easier to preprocess and analyze.  
@@ -165,9 +304,74 @@ empty_string_columns <- colSums(data == "") > 0
 columns_with_na_or_empty <- na_columns | empty_string_columns
 print(names(data)[columns_with_na_or_empty])
 
-data[data == "" | is.na(data)] <- "NA"
+# data[data == "" | is.na(data)] <- "NA"
+# summary(data)
+# unique(data$horsepower)
+# unique(data$displacement)
+# unique(data$cylinders_numeric)
+unique(data$fuel_type_factor)
+unique(data$fuel_type_numeric)
+unique(data$horsepower)
+unique(data$displacement)
+unique(data$cylinders_factor)
+unique(data$cylinders_numeric)
+sum(is.na(data$horsepower))
+sum(is.na(data$displacement))
+table(data$displacement)
+summary(data)
 ```
-There are three columns with empty strings/NA values. Let's examine all three of them to discover if we can find any patterns. 
+There are five columns with empty strings/NA values. Let's examine all five of them to discover if we can find any patterns. 
+
+## horsepower 
+
+```{r}
+# number of unique values in horsepower
+length(table(data$horsepower))
+
+# number of null values in horsepower
+sum(is.na(data$horsepower))
+
+# calculate the counts for horsepower
+horsepower_counts <- table(data$horsepower)
+
+barplot(horsepower_counts,
+  main = "Histogram of Horsepower",
+  xlab = "Horsepower",
+  ylab = "Count",
+  col = "skyblue",
+  las = 2) 
+
+# median imputation 
+data$horsepower[is.na(data$horsepower)] <- median(data$horsepower, na.rm = TRUE)
+```
+
+Since there are 348 unique values in horsepower, we can consider horsepower as a continuous variable rather than categorical. However, there are 810 null values in a dataset with 4009 entries which is over 20% null values. This is too many to simply drop, so we want to perform some form of imputation. Looking at the distribution of horsepowers, we can see that the median is a good representative approximation for the distribution so we will use **median imputation**.
+
+## displacement (engine size)
+
+```{r}
+# number of unique values in displacement
+# table(data$displacement)
+length(table(data$displacement))
+
+# number of null values in displacement
+sum(is.na(data$displacement))
+
+# calculate the counts for horsepower
+displacement_counts <- table(data$displacement)
+
+barplot(displacement_counts,
+  main = "Histogram of Displacement",
+  xlab = "Displacement",
+  ylab = "Count",
+  col = "skyblue",
+  las = 2) 
+
+# median imputation 
+data$displacement[is.na(data$displacement)] <- median(data$displacement, na.rm = TRUE)
+```
+
+There are 61 unique values in displacement (engine size). Although these appear to be discretized measurements (ex: size = 0.8 or size = 3.71 may not make sense), we can treat it as a more continuous predictor for now. There are 396 null values in displacement which is just under 10% null values, so we could consider dropping these. However since the median already exists in the dataset (median = 3.5) we can also proceed with median imputation which is what we did. 
 
 ```{r}
 result <- data %>%
@@ -178,8 +382,26 @@ result <- data %>%
     count = n()
   )
 print(result)
+unique(data$fuel_type_factor)
 ```
 The NA values for fuel_type have a higher median price and average price than other types, and makes up a significant count of observations so we are going to treat it as a separate category.
+
+```{r}
+result <- data %>%
+  group_by(cylinders_factor) %>%
+  summarise(
+    medianprice = median(price),
+    averageprice = mean(price),
+    count = n()
+  )
+print(result)
+unique(data$cylinders)
+```
+cylinder 
+
+```{r}
+data$accident[data$accident == "NA"] <- "None "
+```
 
 ```{r}
 result <- data %>%
@@ -196,7 +418,7 @@ The NA/Empty values for accident exhibit very similar properties to the None rep
 data$accident[data$accident == "NA"] <- "None reported"
 #unique(data$accident)
 data$accident <- ifelse(data$accident == "At least 1 accident or damage reported", 1, 0)
-#unique(data$accident)
+# unique(data$accident)
 ```
 
 ```{r}
@@ -233,24 +455,130 @@ print(paste("Number of outliers: ", nrow(outliers), "and average price of these 
 data <- data[!(data$price < lower_bound | data$price > upper_bound), ]
 ```
 
-#need feature identification and analysis for categorical and numerical variables 
+We remove outliers with 1.5*IQR value. 
+
+#need feature idengtifrication and analysis for categorical and numerical variables 
 #One hot encoding for our categorical variables 
-```{r}
-data[] <- lapply(data, function(x) {
-  if (is.character(x) || is.logical(x)) {
-    as.factor(x)
-  } else {
-    x
-  }
-})
-str(data)
-```
 
 #Final Summary Statistics
 ```{r}
+dim(data)
 summary(data)
-head(data)
 ```
+
+## Unsupervised Learning 
+Apply at least three clustering algorithms to the processed dataset.
+Determine the appropriate number of clusters and discuss the interpretability of these clusters. Do they hold any meaningful distinctions?
+Examine whether the clustering results are associated with your outcome variable.
+
+1. KMeans Clustering 
+```{r}
+data_subset <- data[, c("model_year", "price")]
+data_subset <- na.omit(data_subset)
+data <- scale(data_subset)
+```
+We decided to use kmeans to examine the relation between model_year and price, as we noticed a similar examination in one of the papers while doing the literature review
+
+```{r}
+set.seed(1)
+# Compute silhouette scores for k = 2 to 10
+sil_scores <- sapply(2:10, function(k) {
+  km <- kmeans(scale(data_subset[, c("model_year", "price")]), centers = k, nstart = 10)
+  silhouette(km$cluster, dist(scale(data_subset[, c("model_year", "price")]))) %>%
+    summary() %>%
+    .$avg.width
+})
+# Plot silhouette scores
+plot(2:10, sil_scores, type = "b", pch = 19, frame = FALSE,
+     xlab = "Number of Clusters (k)",
+     ylab = "Average Silhouette Score",
+     main = "Silhouette Method for Optimal k")
+
+```
+
+
+```{r}
+set.seed(1)  
+
+
+kmeans_result <- kmeans(data_subset_scaled, centers = 4)
+
+# Add cluster assignments to the original data
+data_subset$cluster <- as.factor(kmeans_result$cluster)
+
+# Visualize the clusters
+ggplot(data_subset, aes(x = model_year, y = price, color = cluster)) +
+  geom_point(size = 2) +
+  labs(title = "K-Means Clustering on Model Year vs Price",
+       x = "Model Year",
+       y = "Price") +
+  theme_minimal()
+
+
+```
+Two notable things:
+1. There are a couple huge outliers in the price department that is taking up its own cluster
+2.The rest of the clusters (2,3,4) are clearly separated by year ranges. There is a slightly higher range/variation in price in the most recent year range, so there may be a weak relationship between a more recent model_year and higher price
+
+
+
+2. Hierarchical Clustering 
+
+Next, we will try hierarchical clustering with three different linkage methods(single, complete, and average) using euclidean distance. Hierarchical Clustering begins with each data point starting as its own cluster. The goal is to progressively group them together until there is only one group. The process involves choosing the closest two groups, calculated through a specific distance metric. 
+```{r}
+set.seed(1)
+numeric_data <- data[, sapply(data, is.numeric)]
+numeric_data_without_price <- numeric_data[, !colnames(numeric_data) %in% "price"]
+
+hclust_single <- hclust(dist(numeric_data_without_price, method = "euclidean"), method = "single")
+hclust_complete <- hclust(dist(numeric_data_without_price, method = "euclidean"), method = "complete")
+hclust_average <- hclust(dist(numeric_data_without_price, method = "euclidean"), method = "average")
+
+par(mfrow = c(1, 3))
+plot(hclust_single, main = "Single Linkage", xlab = "", sub = "", cex = 0.6)
+plot(hclust_complete, main = "Complete Linkage", xlab = "", sub = "", cex = 0.6)
+plot(hclust_average, main = "Average Linkage", xlab = "", sub = "", cex = 0.6)
+par(mfrow = c(1, 1))
+
+```
+
+```{r}
+
+clusters_complete <- cutree(hclust_complete, k = 4)
+
+
+data$cluster <- as.factor(clusters_complete)
+
+
+table(data$cluster)
+
+cluster_summary <- data %>%
+  group_by(cluster) %>%
+  summarise(
+    avg_price = mean(price, na.rm = TRUE),
+    avg_model_year = mean(model_year, na.rm = TRUE),
+    avg_accident = mean(as.numeric(accident), na.rm = TRUE),  # Replace with proper numeric conversion if needed
+    avg_mileage = mean(mileage, na.rm = TRUE),
+    avg_horsepower = mean(horsepower, na.rm = TRUE),
+    count = n()
+  )
+
+# Print the cluster summary
+print(cluster_summary)
+
+
+```
+
+
+3. Spectral Clustering 
+
+Finally, we will try spectral clustering, which aims to group observations based on their proximity information. This method involves 2 main steps, the first being using the eigenvalues of a similarity matrix to perform dimension reduction, followed by applying a clustering algorithm like K-means. 
+
+```{r}
+set.seed(1)
+specc_result <- specc(as.matrix(train[, -1]), centers = 3, kernel = "rbfdot")
+```
+
 
 ## Prediction Models 
 
