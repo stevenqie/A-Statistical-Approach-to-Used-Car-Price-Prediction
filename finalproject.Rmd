@@ -1,13 +1,15 @@
 ---
 title: "A Statistical Approach to Used Car Price Prediction"
-output: pdf_document
-date: 12/09/2024
+output:
+  pdf_document: default
+  word_document: default
+date: "12/09/2024"
 header-includes:
-  - \usepackage{multicol}
-  - \usepackage{fancyvrb}
-  - \setlength{\columnsep}{1cm}
-  - \usepackage{geometry}
-  - \geometry{margin=1in}
+- \usepackage{multicol}
+- \usepackage{fancyvrb}
+- \setlength{\columnsep}{1cm}
+- \usepackage{geometry}
+- \geometry{margin=1in}
 ---
 
 ```{r setup, include=FALSE}
@@ -110,6 +112,8 @@ library(glmnet)
 library(stats)
 library(dplyr)
 library(class)
+# Load necessary libraries
+
 data <- read.csv("used_cars.csv")
 ```
 
@@ -582,7 +586,6 @@ ggplot(data_subset, aes(x = model_year, y = price, color = cluster)) +
        y = "Price") +
   theme_minimal()
 
-colnames(data_subset)
 ```
 There seems to be a pretty solid relationship between a more recent model_year and higher price. Although the 2 clusters seem to be mostly dominated by model year, it's clear that the average price of cluster 2 is higher than cluster 1.
 
@@ -592,19 +595,19 @@ There seems to be a pretty solid relationship between a more recent model_year a
 
 Next, we will try hierarchical clustering with three different linkage methods(single, complete, and average) using euclidean distance. Hierarchical Clustering begins with each data point starting as its own cluster. The goal is to progressively group them together until there is only one group. The process involves choosing the closest two groups, calculated through a specific distance metric. 
 ```{r}
-numeric_data <- data[, c("model_year", "price")]
-#numeric_data <- data[, sapply(data, is.numeric)]
+#numeric_data <- data[, c("model_year", "price")]
+numeric_data <- data[, sapply(data, is.numeric)]
 numeric_data_without_price <- numeric_data[, !colnames(numeric_data) %in% "price"]
-numeric_data_without_price_scaled <- scale(numeric_data_without_price)
+
 ```
 Removing non-numeric features as clustering requires numeric features. Also, removed the target feature price.
 
 ```{r}
 
 # Perform hierarchical clustering with scaled data
-hclust_single <- hclust(dist(numeric_data_without_price_scaled, method = "euclidean"), method = "single")
-hclust_complete <- hclust(dist(numeric_data_without_price_scaled, method = "euclidean"), method = "complete")
-hclust_average <- hclust(dist(numeric_data_without_price_scaled, method = "euclidean"), method = "average")
+hclust_single <- hclust(dist(numeric_data_without_price, method = "euclidean"), method = "single")
+hclust_complete <- hclust(dist(numeric_data_without_price, method = "euclidean"), method = "complete")
+hclust_average <- hclust(dist(numeric_data_without_price, method = "euclidean"), method = "average")
 
 # Plot the dendrograms
 par(mfrow = c(1, 3))  # Arrange plots side by side
@@ -619,11 +622,11 @@ par(mfrow = c(1, 1))  # Reset plotting layout
 
 
 ```{r}
-# Cut the dendrogram into 4 clusters using single linkage
-clusters_single <- cutree(hclust_single, k = 2)
+# Cut the dendrogram into 2 clusters using complete linkage
+clusters_complete <- cutree(hclust_complete, k = 2)
 
 # Assign cluster labels to the dataset
-data$cluster <- as.factor(clusters_single)
+data$cluster <- as.factor(clusters_complete)
 
 # View the cluster sizes
 table(data$cluster)
@@ -646,7 +649,10 @@ cluster_summary <- data %>%
 print(cluster_summary)
 
 
+
+
 ```
+There are a lot of correlations here that make sense between the 2 clusters. Cluster 1, with a more recent avg_model_year, also has a lower avg_mileage and a lower avg_accident rate, probably because the car has been driven for less time, this cluster also has a much higher avg_price in comparison to cluster 2. The data isn't distributed very well however as a vast majority of the points sit in cluster 1, perhaps suggesting that hierarchical clustering isn't suitable for this dataset.
 
 
 3. Spectral Clustering 
@@ -655,10 +661,51 @@ Finally, we will try spectral clustering, which aims to group observations based
 
 ```{r}
 
+# Step 1: Prepare and scale data
+# Select numeric columns only
+numeric_data <- data[, sapply(data, is.numeric)]  
+numeric_data <- numeric_data[sample(nrow(numeric_data)), ]
+numeric_data_without_price <- numeric_data[, !colnames(numeric_data) %in% "price"]  # Exclude 'price' column
+numeric_data_without_price_scaled <- scale(numeric_data_without_price)  # Scale the data
+
+# Step 2: Subset the first 1000 points
+subset_data <- numeric_data_without_price_scaled[1:1000, ]
+
+# Step 3: Perform spectral clustering
+set.seed(1)  # For reproducibility
+n_clusters <- 2  # Number of clusters
+specc_result <- specc(as.matrix(subset_data), centers = n_clusters, kernel = "rbfdot")
+
+# Step 4: Add cluster assignments to the original dataset
+data$cluster <- NA  # Initialize cluster column
+data$cluster[1:1000] <- as.factor(specc_result@.Data)  # Assign clusters to the first 1000 points
+
+# Step 5: Summarize the clusters
+cluster_summary <- data %>%
+  filter(!is.na(cluster)) %>%
+  group_by(cluster) %>%
+  summarise(
+    avg_model_year = mean(model_year, na.rm = TRUE),
+    avg_mileage = mean(mileage, na.rm = TRUE),
+    avg_accident = mean(as.numeric(accident), na.rm = TRUE),  # Convert 'accident' to numeric if necessary
+    avg_horsepower = mean(horsepower, na.rm = TRUE),
+    count = n()
+  )
+
+# Print the cluster summary
+print(cluster_summary)
+
+# Step 6: Visualize the clusters (optional)
+ggplot(data %>% filter(!is.na(cluster)), aes(x = model_year, y = mileage, color = cluster)) +
+  geom_point(size = 2) +
+  labs(title = "Spectral Clustering Results (First 1000 Points)", x = "Model Year", y = "Mileage") +
+  theme_minimal()
+
 
 
 
 ```
+Similar to Cluster 1, with a more recent avg_model_year, also has a lower avg_mileage and a lower avg_accident rate, this cluster also has a much higher avg_price in comparison to cluster 2. The distribution of data points between the 2 clusters seem to be more even in comparison to heirarchicaly clustering, meaning that perhaps spectral clustering is more suitable for this dataset.
 
 
 ## Prediction Models 
