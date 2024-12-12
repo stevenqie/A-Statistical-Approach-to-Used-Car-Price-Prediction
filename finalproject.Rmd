@@ -109,69 +109,14 @@ library(cluster)
 library(glmnet)
 library(stats)
 library(dplyr)
+library(class)
 data <- read.csv("used_cars.csv")
 ```
 
 #Preliminary Data Cleaning/Modifications
 First, we will removed the dollar sign and comma in price to enable numeric operations
 ```{r}
-#cat(head(data$price, 5), "\n")
 data$price <- as.numeric(gsub("[$,]", "", data$price))
-```
-
-The Engine columns contains very useful information such as the horsepower, displacement, cylinders, engine type, and fuel type. We turn these all into new columns. 
-```{r}
-#head(data$engine, 5)
-
-# Extract Horsepower (HP)
-data$horsepower <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=HP)"))
-
-# Extract Displacement
-data$displacement <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=L)"))
-
-# Extract Cylinders
-data$cylinders <- str_extract(data$engine, "\\d+ Cylinder")
-
-data$cylinders_factor <- factor(str_extract(data$cylinders, "\\d+"))
-
-# Extract Engine Type
-data$engine_type <- str_extract(data$engine, "DOHC|SOHC|Turbo|Twin Turbo|Electric Motor")
-
-# Extract Fuel Type
-data$fuel_type <- str_extract(data$engine, "Gasoline|Diesel|Electric|Hybrid|Flex Fuel|Plug-In Electric/Gas")
-
-# factor fuel type
-data$fuel_type_factor <- factor(data$fuel_type)
-
-# Add <NA> as a valid level in factor types
-data$fuel_type_factor <- addNA(data$fuel_type_factor)
-data$cylinders_factor <- addNA(data$cylinders_factor)
-
-# Rename the <NA> level to "NA"
-levels(data$fuel_type_factor)[is.na(levels(data$fuel_type_factor))] <- "NA"
-levels(data$cylinders_factor)[is.na(levels(data$cylinders_factor))] <- "NA"
-
-data$fuel_type_numeric <- as.numeric(data$fuel_type_factor)
-data$cylinders_numeric <- as.numeric(data$cylinders_factor)
-
-# numeric value assigned:fuel_type_factor (to get it back)
-fuel_type_mapping <- setNames(
-  levels(data$fuel_type_factor),
-  unique(data$fuel_type_numeric)
-)
-
-# numeric value assigned:cylinder_factor
-cylinders_mapping <- setNames(
-  1:length(levels(data$cylinders_factor)),
-  levels(data$cylinders_factor)
-)
-
-unique(data$fuel_type_numeric)
-fuel_type_mapping
-cylinders_mapping
-#deleting the engine column because we have extracted all the information 
-data$engine = NULL
-# colnames(data)
 ```
 
 Corrected the spelling of mileage from milage to mileage. Removed mi. and , to enable numeric operations. Renamed transmission to transmission_ for readability of one hot encoded dummy variables later.
@@ -180,17 +125,59 @@ colnames(data)[colnames(data) == "milage"] <- "mileage"
 data$mileage <- as.numeric(gsub("[,]| mi\\.", "", data$mileage))
 ```
 
-#Analyzing categorical variables
-
+The Engine columns contains very useful information such as the horsepower, displacement, cylinders, engine type, and fuel type. We turn these all into new columns. 
 ```{r}
-# num model and num brand are too large so will just omit 
-length(table(data$brand)) # 57
-length(unique(data$model))
-length(unique(data$transmission)) # 61
+# Extract Horsepower (HP)
+data$horsepower <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=HP)"))
 
+# Extract Displacement
+data$displacement <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=L)"))
+
+# Extract Cylinders
+data$cylinders <- str_extract(data$engine, "\\d+ Cylinder")
+#data$cylinders_factor <- factor(str_extract(data$cylinders, "\\d+"))
+
+# Extract Engine Type
+data$engine_type <- str_extract(data$engine, "DOHC|SOHC|Turbo|Twin Turbo|Electric Motor")
+
+# Extract Fuel Type
+data$fuel_type <- str_extract(data$engine, "Gasoline|Diesel|Electric|Hybrid|Flex Fuel|Plug-In Electric/Gas")
+#data$fuel_type_factor <- factor(data$fuel_type)
+
+#we are done with engine column since we have extracted all the information out 
+data$engine = NULL
+head(data)
+```
+Looking at each column's type and unique count 
+```{r}
+sapply(data, class)
+sapply(data, function(col) {
+  if (is.character(col)) {
+    length(unique(col))
+  } else {
+    NA  # Return NA for non-character columns
+  }
+})
+```
+
+Let's examine columns that include NA or Empty String entries. 
+```{r}
+na_columns <- colSums(is.na(data)) > 0
+empty_string_columns <- colSums(data == "") > 0
+columns_with_na_or_empty <- na_columns | empty_string_columns
+print(names(data)[columns_with_na_or_empty])
+```
+
+#Analyzing categorical variables
+Categorical variables with various unique values include brand, model, transmission, ext_col, int_col. Let's examine all of them
+
+First, we look at the "brand" and the "model" columns. Through analysis shown below, we have decided to omit both of these columns. Our reasoning and visualizations are shown below. 
+
+There are 57 unique brands with the frequency histogram not showing much dominance in a certain brand. To reduce the dimensionality, we will just omit this column 
+```{r}
+length(unique(data$brand)) 
 # calculate the counts for brand
 brandcounts <- table(data$brand)
-
 barplot(brandcounts,
   main = "Histogram of brand",
   xlab = "brand",
@@ -198,6 +185,93 @@ barplot(brandcounts,
   col = "skyblue",
   las = 2) 
 
+#omit this column 
+data$brand = NULL
+```
+This problem is seen even more in the model column. We also omit this column from the dataset 
+```{r}
+length(unique(data$model))
+modelcounts <- table(data$model)
+barplot(modelcounts,
+  main = "Histogram of model",
+  xlab = "model",
+  ylab = "Count",
+  col = "skyblue",
+  las = 2) 
+
+#omit this columm 
+data$model = NULL
+```
+
+Now, let's examine colors. There are both intcol and extcol variables. Having too many unique color names can introduce noise into your classification model and make it harder for the model to generalize effectively. Grouping the colors into broader, more general categories can help improve model performance by reducing the dimensionality of the feature and making patterns more apparent.
+```{r}
+# Define the mapping function
+generalize_colors <- function(color_name) {
+  # Convert to lowercase for uniformity
+  color_lower <- tolower(color_name)
+  
+  # Define patterns for each general category
+  if (str_detect(color_lower, "black")) {
+    return("Black")
+  } else if (str_detect(color_lower, "white|ivory|platinum")) {
+    return("White")
+  } else if (str_detect(color_lower, "gray|grey|silver|slate|charcoal|mica|metallic|graphite")) {
+    return("Gray")
+  } else if (str_detect(color_lower, "brown|beige|tan|camel|mocha|walnut|chestnut|saddle|cappuccino|cocoa")) {
+    return("Brown")
+  } else if (str_detect(color_lower, "silver")) {
+    return("Silver")
+  } else if (str_detect(color_lower, "gold")) {
+    return("Gold")
+  } else {
+    return("Other")  # For colors that don't match any category
+  }
+}
+```
+
+```{r}
+length(unique(data$ext_col))
+extcolorcounts <- table(data$ext_col)
+barplot(extcolorcounts,
+  main = "Histogram of ext_col",
+  xlab = "model",
+  ylab = "Count",
+  col = "skyblue",
+  las = 2) 
+```
+Let's apply the generalization function to simply the different colors
+```{r}
+data$ext_col <- sapply(data$ext_col, generalize_colors)
+unique(data$ext_col)
+```
+
+
+The same thing happens to int_col, but looking at the dataset we will have 4 categories. 
+```{r}
+length(unique(data$int_col))
+intcolorcounts <- table(data$int_col)
+barplot(intcolorcounts,
+  main = "Histogram of interior color",
+  xlab = "model",
+  ylab = "Count",
+  col = "skyblue",
+  las = 2) 
+
+# Grouping less frequent categories
+data$int_col <- ifelse(
+  data$int_col %in% c("Black", "Jet Black", "AMG Black"),
+  "Black",
+  ifelse(data$int_col %in% c("Beige", "Ivory"), "Beige/Ivory",
+         ifelse(data$int_col %in% c("Gray", "Graphite"), "Gray",
+                "Other"))
+)
+
+unique(data$int_col)
+```
+
+Examining the transmission column now 
+```{r}
+length(unique(data$transmission))
 # calculate the counts for transmission
 trancounts <- table(data$transmission)
 
@@ -207,9 +281,7 @@ barplot(trancounts,
   ylab = "Count",
   col = "skyblue",
   las = 2) 
-```
 
-```{r}
 result <- data %>%
   group_by(transmission) %>%
   summarise(
@@ -225,12 +297,12 @@ significant_transmissions <- result_sorted$transmission[result_sorted$count > th
 print(significant_transmissions)
 ```
 
+Now, we have looked at all the categorical variables with many many unique values, we will now one-hot encode the cagtegorical vairables. 
 # One-hot encoding categorical variables 
 
 After looking at histograms for both Brand and Transmission, it seems Brand is more uniformly distributed while Transmission has a few salient categories. After exploring the categories of transmissions we found that the top 7 most frequent transmissions account for approximately 67-70% of the data points. Therefore we will one hot encode these 7 categories + an "Other" category for Transmission for a total of 8 transmission categories. We will also one hot encode "fuel type" and "cylinders" since those are categorical variables as well.
 
 ## Transmission
-Transmission, fuel_type, cylinders 
 
 ```{r}
 # map transmissions to just the top 7 or Other. could make this function take in significant_transmissions too for extensibility
@@ -254,46 +326,6 @@ map_transmission <- function(transmission) {
 
 # Apply the mapping function
 data$transmission <- sapply(data$transmission, map_transmission)
-
-# One-hot encoding
-transmission_dummies <- model.matrix(~ transmission - 1, data = data)
-transmission_dummies <- as.data.frame(transmission_dummies)
-
-colnames(transmission_dummies) <- gsub("transmission", "transmission type: ", colnames(transmission_dummies))
-
-# summary(transmission_dummies)
-
-# Add the dummy columns to the original dataframe
-data <- cbind(data, transmission_dummies)
-
-# factor transmission as well
-
-data$transmission_factored <- factor(data$transmission)
-```
-
-## cylinders
-```{r}
-# One-hot encoding
-cyl_dummies <- model.matrix(~ cylinders_factor - 1, data = data)
-cyl_dummies <- as.data.frame(cyl_dummies)
-
-colnames(cyl_dummies) <- gsub("cylinders_factor", "cylinder number ", colnames(cyl_dummies))
-
-# summary(cyl_dummies)
-
-data <- cbind(data, cyl_dummies)
-```
-
-## fuel_type
-
-```{r}
-# One-hot encoding
-fuel_dummies <- model.matrix(~ fuel_type_factor - 1, data = data)
-fuel_dummies <- as.data.frame(fuel_dummies)
-
-colnames(fuel_dummies) <- gsub("fuel_type_factor", "fuel type ", colnames(fuel_dummies))
-
-data <- cbind(data, fuel_dummies)
 ```
 
 #Analyzing Null/Empty Values 
@@ -343,6 +375,8 @@ barplot(horsepower_counts,
 
 # median imputation 
 data$horsepower[is.na(data$horsepower)] <- median(data$horsepower, na.rm = TRUE)
+
+sum(is.na(data$horsepower))
 ```
 
 Since there are 348 unique values in horsepower, we can consider horsepower as a continuous variable rather than categorical. However, there are 810 null values in a dataset with 4009 entries which is over 20% null values. This is too many to simply drop, so we want to perform some form of imputation. Looking at the distribution of horsepowers, we can see that the median is a good representative approximation for the distribution so we will use **median imputation**.
@@ -369,6 +403,8 @@ barplot(displacement_counts,
 
 # median imputation 
 data$displacement[is.na(data$displacement)] <- median(data$displacement, na.rm = TRUE)
+
+sum(is.na(data$displacement))
 ```
 
 There are 61 unique values in displacement (engine size). Although these appear to be discretized measurements (ex: size = 0.8 or size = 3.71 may not make sense), we can treat it as a more continuous predictor for now. There are 396 null values in displacement which is just under 10% null values, so we could consider dropping these. However since the median already exists in the dataset (median = 3.5) we can also proceed with median imputation which is what we did. 
@@ -382,25 +418,25 @@ result <- data %>%
     count = n()
   )
 print(result)
-unique(data$fuel_type_factor)
+data$fuel_type[is.na(data$fuel_type)] <- "NA"
+
 ```
 The NA values for fuel_type have a higher median price and average price than other types, and makes up a significant count of observations so we are going to treat it as a separate category.
 
+#cylinder 
 ```{r}
 result <- data %>%
-  group_by(cylinders_factor) %>%
+  group_by(cylinders) %>%
   summarise(
     medianprice = median(price),
     averageprice = mean(price),
     count = n()
   )
 print(result)
-unique(data$cylinders)
+data$cylinders[is.na(data$cylinders)] <- "NA"
 ```
-cylinder 
 
-
-
+#accident 
 ```{r}
 result <- data %>%
   group_by(accident) %>%
@@ -413,7 +449,10 @@ print(result)
 ```
 The NA/Empty values for accident exhibit very similar properties to the None reported category, with median price and average price being pretty similar, not to mention a very small percentage of data is represented by this value. Therefore, we replace and combine these observations with the None reported category. Because accident only has 2 unique values now, no accidents and 1 or more accidents, we changed it to 1,0 to be useful for models. 
 ```{r}
+data$accident[data$accident == "NA"] <- "None reported"
+#unique(data$accident)
 data$accident <- ifelse(data$accident == "At least 1 accident or damage reported", 1, 0)
+# unique(data$accident)
 ```
 
 ```{r}
@@ -433,32 +472,69 @@ data$clean_title <-ifelse(data$clean_title == "Yes", 1, 0)
 unique(data$clean_title)
 ```
 
+#engine type 
+```{r}
+# calculate the counts for horsepower
+engine_counts <- table(data$engine_type)
+
+barplot(engine_counts,
+  main = "Histogram of engine_type",
+  xlab = "Engine Type",
+  ylab = "Count",
+  col = "skyblue",
+  las = 2) 
+
+result <- data %>%
+  group_by(engine_type) %>%
+  summarise(
+    medianprice = median(price),
+    averageprice = mean(price),
+    count = n()
+  )
+print(result)
+
+data$engine_type[is.na(data$engine_type)] <- "NA"
+```
+
 #Removing Outliers 
+We remove outliers with 1.5*IQR value.
 ```{r}
 Q1 <- quantile(data$price, 0.25, na.rm = TRUE)
 Q3 <- quantile(data$price, 0.75, na.rm = TRUE)
 IQR_value <- IQR(data$price, na.rm = TRUE)
 
-
+# Identify outliers using IQR
 lower_bound <- Q1 - 1.5 * IQR_value
 upper_bound <- Q3 + 1.5 * IQR_value
 
 outliers <- data[data$price < lower_bound | data$price > upper_bound, ]
 print(paste("Number of outliers: ", nrow(outliers), "and average price of these cars: ", round(mean(outliers$price), 2)))
       
-
+#removing these rows from the dataset
 data <- data[!(data$price < lower_bound | data$price > upper_bound), ]
 ```
 
-We remove outliers with 1.5*IQR value. 
+```{r}
+summary(data)
+```
+#turning each categorial column into a factor type 
+```{r}
+data[sapply(data, is.character)] <- lapply(data[sapply(data, is.character)], as.factor)
+```
 
-#need feature idengtifrication and analysis for categorical and numerical variables 
-#One hot encoding for our categorical variables 
+
+#one hot encoding
+Some models will require one hot encoding. For these models, we create a new dataset and apply this one hot encoding 
+```{r}
+dummy_model <- dummyVars(~ ., data = data)
+data_one_hot <- as.data.frame(predict(dummy_model, newdata = data))
+```
+
 
 #Final Summary Statistics
 ```{r}
-dim(data)
-summary(data)
+dim(data_one_hot)
+summary(data_one_hot)
 ```
 
 ## Unsupervised Learning 
@@ -589,9 +665,8 @@ Finally, we will try spectral clustering, which aims to group observations based
 
 For all the supervised models below, we will split the data into training sets for model training and testing sets to evaluate performance and accuracy
 ```{r}
-#head(data)
-y = data$price
-X = data[, -ncol(data)]
+y = data_one_hot$price
+X <- data_one_hot[, !(colnames(data_one_hot) %in% "price")]
 #test_idx = sample(nrow(data), size = 0.2 * nrow(data))
 #xtrain = X[ -test_idx, ]
 #xtest  = X[ test_idx, ]
@@ -606,73 +681,85 @@ ytest = y[!sample]
 
 #as.matrix(xtrain)
 #sum(is.na(xtrain)
-colnames(xtrain)
+#colnames(xtrain)
+head(xtrain)
 ```
 
-1. Linear Model. There are mainly three possible linear models: Lasso, Ridge, and Elastic Net. We will try all three models and see which one performs the best. Lasso, Ridge, and Elastic Net all benefit from feature scaling because these models involve regularization. which will penalize the size of coefficients of the model to avoid overfitting. All 3 models also involving a tuning parameter, and so we will use k-fold cross validation to find the best parameters. 
-APPLY ONE HOT ENCODING 
-
-```{r}
-#apply one hot encoding first 
-xtrain <- model.matrix(~ . - 1, data = xtrain)
-```
+1. Linear Model. There are mainly three possible linear models: Lasso, Ridge, and Elastic Net. We will try all three models and see which one performs the best. Lasso, Ridge, and Elastic Net all benefit from feature scaling because these models involve regularization. which will penalize the size of coefficients of the model to avoid overfitting. All 3 models also involving a tuning parameter, and so we will use k-fold cross validation to find the best parameters. cv.glmnet will automatically scale and center the data as well. 
 
 Training our ridge model 
 ```{r}
-xtrain <- model.matrix(~ . - 1, data = xtrain)
-ridgemodel = cv.glmnet(x = xtrain, y = ytrain, nfolds = 10, alpha = 0)
-
+ridgemodel = cv.glmnet(x = as.matrix(xtrain), y = ytrain, nfolds = 10, alpha = 0)
 ```
 
 ```{r}
 ridgemodel$lambda.min
 
-pred1 = predict(ridgemodel, newx = xtest, s = "lambda.min")
-sqrt(mean((pred1 - ytest)^2))
+pred = predict(ridgemodel, newx = as.matrix(xtest), s = "lambda.min")
+sqrt(mean((pred - ytest)^2))
 ```
 
 Training our lasso model 
 ```{r}
-lassomodel = cv.glmnet(x = xtrain, y = ytrain, nfolds = 10, alpha = 1)
+lassomodel = cv.glmnet(x = as.matrix(xtrain), y = ytrain, nfolds = 10, alpha = 1)
 ```
 
 ```{r}
 lassomodel$lambda.min
 
-pred1 = predict(lassomodel, newx = xtest, s = "lambda.min")
-sqrt(mean((pred1 - ytest)^2))
+pred = predict(lassomodel, newx = as.matrix(xtest), s = "lambda.min")
+sqrt(mean((pred - ytest)^2))
 ```
 
 Training our elastic net model 
 ```{r}
-elastic_net_model <- cv.glmnet(x = xtrain, y = ytrain, nfolds = 10, alpha = 0.5)
+elastic_net_model <- cv.glmnet(x = as.matrix(xtrain), y = ytrain, nfolds = 10, alpha = 0.5)
 ```
 
 ```{r}
 elastic_net_model$lambda.min
 
-pred1 = predict(elastic_net_model, newx = xtest, s = "lambda.min")
+pred1 = predict(elastic_net_model, newx = as.matrix(xtest), s = "lambda.min")
 sqrt(mean((pred1 - ytest)^2))
 ```
 
-Out of our 3 linear models, Lasso performed the best, with a RMSE of _______
+Out of our 3 linear models, Ridge performed the best, with a RMSE of 12261.19 
 
 
 2. K Nearest Neighbors(KNN) regression works by calculating the k nearest training set data points to the test point and predicting the target value by taking the average of their target values. KNN is sensitive to feature scaling, so we will need to scale the data. The reason behind this is for example, if one feature has ranges from 1-10 and another one has 1-10000, distance calcualtions will be biased and results will suffer as a result. KNN is also sensitive to the choice of k. To find the optimal value of k, we will perform k-fold cross validation. 
 ```{r}
-xtrain
-```
-
-```{r}
 set.seed(1)
 
-dmy <- dummyVars(" ~ .", data = xtrain)
-trsf <- data.frame(predict(dmy, newdata = xtrain))
+# 2. Scale the numeric columns
+preProcValues <- preProcess(xtrain, method = c("center", "scale"))
 
-print(trsf)
+# Apply scaling and centering to the training and test data
+xtrain_processed <- predict(preProcValues, xtrain)
+xtest_processed <- predict(preProcValues, xtest)
 
+pca_model <- prcomp(xtrain_processed, center = TRUE, scale. = TRUE)
+explained_variance <- summary(pca_model)$importance[3, ]  # Cumulative variance
+num_components <- which(explained_variance >= 0.95)[1]   # First component to reach 95%
 
+# Print the number of components
+cat("Number of components to retain:", num_components, "\n")
 
+# Transform the training and testing data
+xtrain_pca <- pca_model$x[, 1:num_components]  # Retain the first num_components
+xtest_pca <- as.matrix(xtest_processed) %*% pca_model$rotation[, 1:num_components]
+
+# 3. Train the KNN model using the processed data
+control <- trainControl(method = "cv", number = 10)
+knn.cvfit <- train(ytrain ~ ., method = "knn", 
+                   data = data.frame(xtrain_pca, ytrain),
+                   tuneGrid = data.frame(k = seq(1, 45, 1)),
+                   trControl = control)
+
+# 4. Plot the cross-validation results
+plot(knn.cvfit)
+
+# 6. Print the best value of k based on cross-validation
+print(paste("The best value of k based on cross-validation is: ", knn.cvfit$bestTune$k))
 ```
 
 ```{r}
@@ -681,16 +768,11 @@ best_k <- knn.cvfit$bestTune$k
 knn_predictions <- knn(train = xtrain_processed, test = xtest_processed, cl = ytrain, k = best_k)
 
 # Calculate prediction error 
-print(paste("RMSE: ", sqrt(mean((as.numeric(knn_predictions) - ytest)^2))))
+print(paste("Prediction errort: ", sqrt(mean((as.numeric(knn_predictions) - ytest)^2))))
 ```
 
 
 3. Random Forest 
-```{r}
-rf_model <- randomForest(train_labels ~ ., data = as.data.frame(train_data))
-
-rf_predictions <- predict(rf_model, newdata = as.data.frame(test_data))
-```
 4. SVM? does this count as a linear model 
 5. Gradient Boosting Regressor 
 
@@ -698,4 +780,3 @@ rf_predictions <- predict(rf_model, newdata = as.data.frame(test_data))
 A researcher is interested in estimating the original price of the cars in your dataset as if they were brand new. 
 
 Since you are predicting prices without direct historical data for new cars, you may be extrapolating beyond the range of your training data, which can lead to inaccuracies. External factors such as changes in market demand, economic conditions, or new models being released can affect car prices but may not be captured in your model.
-
