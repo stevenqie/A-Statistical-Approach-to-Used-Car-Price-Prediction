@@ -178,7 +178,6 @@ Corrected the spelling of mileage from milage to mileage. Removed mi. and , to e
 ```{r}
 colnames(data)[colnames(data) == "milage"] <- "mileage"
 data$mileage <- as.numeric(gsub("[,]| mi\\.", "", data$mileage))
-colnames(data)[colnames(data) == "transmission"] <- "transmission_"
 ```
 
 #Analyzing categorical variables
@@ -212,7 +211,7 @@ barplot(trancounts,
 
 ```{r}
 result <- data %>%
-  group_by(transmission_) %>%
+  group_by(transmission) %>%
   summarise(
     medianprice = median(price),
     averageprice = mean(price),
@@ -222,13 +221,13 @@ result_sorted <- result %>%
   arrange(desc(count))
 print(result_sorted)
 threshold <- quantile(result_sorted$count, 0.9) # 205.7
-significant_transmissions <- result_sorted$transmission_[result_sorted$count > threshold]
+significant_transmissions <- result_sorted$transmission[result_sorted$count > threshold]
 print(significant_transmissions)
 ```
 
-After looking at histograms for both Brand and Transmission, it seems Brand is more uniformly distributed while Transmission has a few salient categories. After exploring the categories of transmissions we found that the top 7 most frequent transmissions account for approximately 67-70% of the data points. Therefore we will one hot encode these 7 categories + an "Other" category for Transmission for a total of 8 transmission categories.
-
 # One-hot encoding categorical variables 
+
+After looking at histograms for both Brand and Transmission, it seems Brand is more uniformly distributed while Transmission has a few salient categories. After exploring the categories of transmissions we found that the top 7 most frequent transmissions account for approximately 67-70% of the data points. Therefore we will one hot encode these 7 categories + an "Other" category for Transmission for a total of 8 transmission categories. We will also one hot encode "fuel type" and "cylinders" since those are categorical variables as well.
 
 ## Transmission
 Transmission, fuel_type, cylinders 
@@ -254,20 +253,22 @@ map_transmission <- function(transmission) {
 }
 
 # Apply the mapping function
-data$transmission_ <- sapply(data$transmission_, map_transmission)
+data$transmission <- sapply(data$transmission, map_transmission)
 
 # One-hot encoding
-transmission_dummies <- model.matrix(~ transmission_ - 1, data = data)
+transmission_dummies <- model.matrix(~ transmission - 1, data = data)
 transmission_dummies <- as.data.frame(transmission_dummies)
 
-summary(transmission_dummies)
+colnames(transmission_dummies) <- gsub("transmission", "transmission type: ", colnames(transmission_dummies))
+
+# summary(transmission_dummies)
 
 # Add the dummy columns to the original dataframe
 data <- cbind(data, transmission_dummies)
 
 # factor transmission as well
 
-data$transmission_factored <- factor(data$transmission_)
+data$transmission_factored <- factor(data$transmission)
 ```
 
 ## cylinders
@@ -278,17 +279,22 @@ cyl_dummies <- as.data.frame(cyl_dummies)
 
 colnames(cyl_dummies) <- gsub("cylinders_factor", "cylinder number ", colnames(cyl_dummies))
 
-summary(cyl_dummies)
-
-unique(data$cylinders_factor)
+# summary(cyl_dummies)
 
 data <- cbind(data, cyl_dummies)
-
-summary(data)
-dim(data)
 ```
 
 ## fuel_type
+
+```{r}
+# One-hot encoding
+fuel_dummies <- model.matrix(~ fuel_type_factor - 1, data = data)
+fuel_dummies <- as.data.frame(fuel_dummies)
+
+colnames(fuel_dummies) <- gsub("fuel_type_factor", "fuel type ", colnames(fuel_dummies))
+
+data <- cbind(data, fuel_dummies)
+```
 
 #Analyzing Null/Empty Values 
 We will first look at the problem with NA and Empty values, something that this dataset has a lot of. We will first handle both NA and Empty "" values by replacing them to "NA" to make it easier to preprocess and analyze.  
@@ -473,6 +479,7 @@ END OF LEFTOVER BRIANS STUFF
 
 #Final Summary Statistics
 ```{r}
+dim(data)
 summary(data)
 ```
 
