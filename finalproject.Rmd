@@ -508,7 +508,7 @@ ggplot(data_subset, aes(x = model_year, y = price, color = cluster)) +
 
 colnames(data_subset)
 ```
-The 2 clusters are clearly split by both year and price. Cluster 1 is made up of older cars and has a 
+There seems to be a pretty solid relationship between a more recent model_year and higher price. Although the 2 clusters seem to be mostly dominated by model year, it's clear that the average price of cluster 2 is higher than cluster 1.
 
 
 
