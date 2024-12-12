@@ -260,6 +260,7 @@ unique(data$cylinders_numeric)
 sum(is.na(data$horsepower))
 sum(is.na(data$displacement))
 table(data$displacement)
+summary(data)
 ```
 There are five columns with empty strings/NA values. Let's examine all five of them to discover if we can find any patterns. 
 
@@ -326,6 +327,19 @@ print(result)
 unique(data$fuel_type_factor)
 ```
 The NA values for fuel_type have a higher median price and average price than other types, and makes up a significant count of observations so we are going to treat it as a separate category.
+
+```{r}
+result <- data %>%
+  group_by(cylinders_factor) %>%
+  summarise(
+    medianprice = median(price),
+    averageprice = mean(price),
+    count = n()
+  )
+print(result)
+unique(data$cylinders)
+```
+cylinder 
 
 ```{r}
 data$accident[data$accident == "NA"] <- "None "
