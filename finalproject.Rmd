@@ -399,9 +399,7 @@ unique(data$cylinders)
 ```
 cylinder 
 
-```{r}
-data$accident[data$accident == "NA"] <- "None "
-```
+
 
 ```{r}
 result <- data %>%
@@ -415,10 +413,7 @@ print(result)
 ```
 The NA/Empty values for accident exhibit very similar properties to the None reported category, with median price and average price being pretty similar, not to mention a very small percentage of data is represented by this value. Therefore, we replace and combine these observations with the None reported category. Because accident only has 2 unique values now, no accidents and 1 or more accidents, we changed it to 1,0 to be useful for models. 
 ```{r}
-data$accident[data$accident == "NA"] <- "None reported"
-#unique(data$accident)
 data$accident <- ifelse(data$accident == "At least 1 accident or damage reported", 1, 0)
-# unique(data$accident)
 ```
 
 ```{r}
@@ -444,14 +439,14 @@ Q1 <- quantile(data$price, 0.25, na.rm = TRUE)
 Q3 <- quantile(data$price, 0.75, na.rm = TRUE)
 IQR_value <- IQR(data$price, na.rm = TRUE)
 
-# Identify outliers using IQR
+
 lower_bound <- Q1 - 1.5 * IQR_value
 upper_bound <- Q3 + 1.5 * IQR_value
 
 outliers <- data[data$price < lower_bound | data$price > upper_bound, ]
 print(paste("Number of outliers: ", nrow(outliers), "and average price of these cars: ", round(mean(outliers$price), 2)))
       
-#removing these rows from the dataset
+
 data <- data[!(data$price < lower_bound | data$price > upper_bound), ]
 ```
 
@@ -475,38 +470,35 @@ Examine whether the clustering results are associated with your outcome variable
 ```{r}
 data_subset <- data[, c("model_year", "price")]
 data_subset <- na.omit(data_subset)
-data <- scale(data_subset)
+data_subset_scaled <- scale(data_subset)
 ```
-We decided to use kmeans to examine the relation between model_year and price, as we noticed a similar examination in one of the papers while doing the literature review
+We decided to use kmeans to examine the relation between model_year and price, as we noticed a similar examination in one of the papers while doing the literature review. Because K-means utilizes distance metrics, we scale the data before clustering.
 
 ```{r}
 set.seed(1)
-# Compute silhouette scores for k = 2 to 10
+
 sil_scores <- sapply(2:10, function(k) {
-  km <- kmeans(scale(data_subset[, c("model_year", "price")]), centers = k, nstart = 10)
+  km <- kmeans(scale(data_subset_scaled[, c("model_year", "price")]), centers = k, nstart = 10)
   silhouette(km$cluster, dist(scale(data_subset[, c("model_year", "price")]))) %>%
     summary() %>%
     .$avg.width
 })
-# Plot silhouette scores
+
 plot(2:10, sil_scores, type = "b", pch = 19, frame = FALSE,
      xlab = "Number of Clusters (k)",
      ylab = "Average Silhouette Score",
      main = "Silhouette Method for Optimal k")
 
 ```
+We decided to use the Silhouette Method to determine the optimal number of clusters. This method essentially uses distance measures calculating how close clusters are to themselves and how far away they are to other clusters to judge the optimal number of clusters. In this case, 2 has the highest average silhouette score so we will use k=2.
 
 
 ```{r}
 set.seed(1)  
 
-
-kmeans_result <- kmeans(data_subset_scaled, centers = 4)
-
-# Add cluster assignments to the original data
+kmeans_result <- kmeans(data_subset_scaled, centers = 2)
 data_subset$cluster <- as.factor(kmeans_result$cluster)
 
-# Visualize the clusters
 ggplot(data_subset, aes(x = model_year, y = price, color = cluster)) +
   geom_point(size = 2) +
   labs(title = "K-Means Clustering on Model Year vs Price",
@@ -514,11 +506,9 @@ ggplot(data_subset, aes(x = model_year, y = price, color = cluster)) +
        y = "Price") +
   theme_minimal()
 
-
+colnames(data_subset)
 ```
-Two notable things:
-1. There are a couple huge outliers in the price department that is taking up its own cluster
-2.The rest of the clusters (2,3,4) are clearly separated by year ranges. There is a slightly higher range/variation in price in the most recent year range, so there may be a weak relationship between a more recent model_year and higher price
+The 2 clusters are clearly split by both year and price. Cluster 1 is made up of older cars and has a 
 
 
 
