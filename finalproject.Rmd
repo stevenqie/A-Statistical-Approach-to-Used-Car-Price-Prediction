@@ -124,54 +124,29 @@ The Engine columns contains very useful information such as the horsepower, disp
 #head(data$engine, 5)
 
 # Extract Horsepower (HP)
-data$horsepower <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=HP)"))
+#data$horsepower <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=HP)"))
 
 # Extract Displacement
-data$displacement <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=L)"))
+#data$displacement <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=L)"))
 
 # Extract Cylinders
-data$cylinders <- str_extract(data$engine, "\\d+ Cylinder")
+#data$cylinders <- str_extract(data$engine, "\\d+ Cylinder")
 
-data$cylinders_factor <- factor(str_extract(data$cylinders, "\\d+"))
+#data$cylinders_numeric <- as.numeric(str_extract(data$cylinders, "\\d+"))
 
 # Extract Engine Type
-data$engine_type <- str_extract(data$engine, "DOHC|SOHC|Turbo|Twin Turbo|Electric Motor")
+#data$engine_type <- str_extract(data$engine, "DOHC|SOHC|Turbo|Twin Turbo|Electric Motor")
 
 # Extract Fuel Type
-data$fuel_type <- str_extract(data$engine, "Gasoline|Diesel|Electric|Hybrid|Flex Fuel|Plug-In Electric/Gas")
+#data$fuel_type <- str_extract(data$engine, "Gasoline|Diesel|Electric|Hybrid|Flex Fuel|Plug-In Electric/Gas")
 
 # factor fuel type
-data$fuel_type_factor <- factor(data$fuel_type)
+#data$fuel_type_factor <- factor(data$fuel_type)
+#data$fuel_type_numeric <- as.numeric(data$fuel_type_factor)
 
-# Add <NA> as a valid level in factor types
-data$fuel_type_factor <- addNA(data$fuel_type_factor)
-data$cylinders_factor <- addNA(data$cylinders_factor)
-
-# Rename the <NA> level to "NA"
-levels(data$fuel_type_factor)[is.na(levels(data$fuel_type_factor))] <- "NA"
-levels(data$cylinders_factor)[is.na(levels(data$cylinders_factor))] <- "NA"
-
-data$fuel_type_numeric <- as.numeric(data$fuel_type_factor)
-data$cylinders_numeric <- as.numeric(data$cylinders_factor)
-
-# numeric value assigned:fuel_type_factor (to get it back)
-fuel_type_mapping <- setNames(
-  levels(data$fuel_type_factor),
-  unique(data$fuel_type_numeric)
-)
-
-# numeric value assigned:cylinder_factor
-cylinders_mapping <- setNames(
-  1:length(levels(data$cylinders_factor)),
-  levels(data$cylinders_factor)
-)
-
-unique(data$fuel_type_numeric)
-fuel_type_mapping
-cylinders_mapping
 #deleting the engine column because we have extracted all the information 
-data$engine = NULL
-# colnames(data)
+#data$engine = NULL
+#colnames(data)
 ```
 
 Corrected the spelling of mileage from milage to mileage. Removed mi. and , to enable numeric operations. Renamed transmission to transmission_ for readability of one hot encoded dummy variables later.
@@ -459,6 +434,10 @@ We remove outliers with 1.5*IQR value.
 
 #need feature idengtifrication and analysis for categorical and numerical variables 
 #One hot encoding for our categorical variables 
+```{r}
+col_classes = sapply(data, class)
+print(col_classes)
+```
 
 #Final Summary Statistics
 ```{r}
@@ -581,94 +560,86 @@ specc_result <- specc(as.matrix(train[, -1]), centers = 3, kernel = "rbfdot")
 
 
 ## Prediction Models 
-```{r}
-head(data)
-```
+
 For all the supervised models below, we will split the data into training sets for model training and testing sets to evaluate performance and accuracy
 ```{r}
 y = data$price
-X = data.matrix(cbind(1, data[, setdiff(names(data), "price")]))
+X = data.matrix(cbind(data[, setdiff(names(data), "price")]))
 test_idx = sample(nrow(data), size = 0.2 * nrow(data))
 xtrain = X[ -test_idx, ]
 xtest  = X[ test_idx, ]
 ytrain = y[ -test_idx ]
 ytest  = y[ test_idx ]
+
+colnames(xtrain)
 ```
 
 1. Linear Model. There are mainly three possible linear models: Lasso, Ridge, and Elastic Net. We will try all three models and see which one performs the best. Lasso, Ridge, and Elastic Net all benefit from feature scaling because these models involve regularization. which will penalize the size of coefficients of the model to avoid overfitting. All 3 models also involving a tuning parameter, and so we will use k-fold cross validation to find the best parameters. 
 
+Training our ridge model 
 ```{r}
-set.seed(1)
-#feature scale the data 
-xtraincopy <- xtrain 
-xtestcopy <- xtest
-xtrain_scaled <- scale(xtraincopy)  
-xtest_scaled <- scale(xtestcopy, center = attr(xtrain_scaled, "scaled:center"), scale = attr(xtrain_scaled, "scaled:scale"))
+ridgemodel = cv.glmnet(x = xtrain, y = ytrain, nfolds = 10, alpha = 0)
+
 ```
 
-Setup for k-fold Cross Validation 
 ```{r}
-train_control <- trainControl(method = "cv", number = 10)  # 10-fold cross-validation
+ridgemodel$lambda.min
 
-lasso_grid <- expand.grid(alpha = 1, lambda = seq(0.01, 1, by = 0.01))
-ridge_grid <- expand.grid(alpha = 0, lambda = seq(0.01, 1, by = 0.01))
-elastic_net_grid <- expand.grid(alpha = seq(0, 1, by = 0.1), lambda = seq(0.01, 1, by = 0.01))
+pred1 = predict(ridgemodel, newx = xtest, s = "lambda.min")
+sqrt(mean((pred1 - ytest)^2))
 ```
 
-Training our 3 models 
+Training our lasso model 
 ```{r}
-lasso_model <- train(x = xtrain_scaled, y = ytrain, method = "glmnet", trControl = train_control, tuneGrid = lasso_grid)
-ridge_model <- train(x = xtrain_scaled, y = ytrain, method = "glmnet", trControl = train_control, tuneGrid = ridge_grid)
-elastic_net_model <- train(x = xtrain_scaled, y = ytrain, method = "glmnet", trControl = train_control, tuneGrid = elastic_net_grid)
+lassomodel = cv.glmnet(x = xtrain, y = ytrain, nfolds = 10, alpha = 1)
 ```
 
-Finding the best tuning parameters for all of them 
 ```{r}
-print(paste("Best tuning parameter for Lasso: ", lasso_model$bestTune))
-print(paste("Best tuning parameters for Ridge:", ridge_model$bestTune))
-print(paste("Best tuning parameters for Elastic Net:", elastic_net_model$bestTune))
+lassomodel$lambda.min
+
+pred1 = predict(lassomodel, newx = xtest, s = "lambda.min")
+sqrt(mean((pred1 - ytest)^2))
 ```
 
-Predict on our test set and find prediction error 
+Training our elastic net model 
 ```{r}
-lasso_pred <- predict(lasso_model, Xtest)
-ridge_pred <- predict(ridge_model, Xtest)
-elastic_net_pred <- predict(elastic_net_model, Xtest)
-
-print(paste("Lasso model prediction error:", mean((lasso_pred - ytest)^2)))
-print(paste("Ridge model prediction error:", mean((ridge_pred - ytest)^2)))
-print(paste("Elastic net prediction error: ", mean((elastic_net_pred - ytest)^2)))
+elastic_net_model <- cv.glmnet(x = xtrain, y = ytrain, nfolds = 10, alpha = 0.5)
 ```
-Out of our 3 linear models, ... performed the best 
+
+```{r}
+elastic_net_model$lambda.min
+
+pred1 = predict(elastic_net_model, newx = xtest, s = "lambda.min")
+sqrt(mean((pred1 - ytest)^2))
+```
+
+Out of our 3 linear models, Lasso performed the best, with a RMSE of _______
 
 
 2. K Nearest Neighbors(KNN) regression works by calculating the k nearest training set data points to the test point and predicting the target value by taking the average of their target values. KNN is sensitive to feature scaling, so we will need to scale the data. The reason behind this is for example, if one feature has ranges from 1-10 and another one has 1-10000, distance calcualtions will be biased and results will suffer as a result. KNN is also sensitive to the choice of k. To find the optimal value of k, we will perform k-fold cross validation. 
 
 ```{r}
 set.seed(1)
-# feature scale 
-xtraincopy <- xtrain 
-xtestcopy <- xtest
-xtrain_scaled <- scale(xtraincopy)  
-xtest_scaled <- scale(xtestcopy, center = attr(xtrain_scaled, "scaled:center"), scale = attr(xtrain_scaled, "scaled:scale"))
-```
 
-```{r}
-#train knn algorithm and perform k fold cross validation
+# 2. Scale the numeric columns
+preProcValues <- preProcess(xtrain, method = c("center", "scale"))
+
+# Apply scaling and centering to the training and test data
+xtrain_processed <- predict(preProcValues, xtrain)
+xtest_processed <- predict(preProcValues, xtest)
+
+# 3. Train the KNN model using the processed data
 control <- trainControl(method = "cv", number = 10)
-knn.cvfit <- train(y ~ ., method = "knn", 
-                     data = data.frame(xtrain_scaled, ytrain,
-                     tuneGrid = data.frame(k = seq(1, 40, 1)),
-                     trControl = control)
-# Plot the cross-validation results to visualize performance
-plot(knn_model)
+knn.cvfit <- train(ytrain ~ ., method = "knn", 
+                   data = data.frame(xtrain_processed, ytrain),
+                   tuneGrid = data.frame(k = seq(1, 40, 1)),
+                   trControl = control)
 
-#plot k vs regression error 
-plot(knn.cvfit$results$k, 1-knn.cvfit$results$Accuracy,
-     xlab = "K", ylab = "Regression Error", type = "b",
-     pch = 19, col = "darkorange")
+# 4. Plot the cross-validation results
+plot(knn.cvfit)
 
-print(paste("The best value of k based on cross-validation is: ", knn_model$bestTune))
+# 6. Print the best value of k based on cross-validation
+print(paste("The best value of k based on cross-validation is: ", knn.cvfit$bestTune$k))
 ```
 
 ```{r}
