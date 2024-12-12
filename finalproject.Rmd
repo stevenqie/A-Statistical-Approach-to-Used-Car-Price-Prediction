@@ -132,7 +132,7 @@ data$displacement <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=L)"))
 # Extract Cylinders
 data$cylinders <- str_extract(data$engine, "\\d+ Cylinder")
 
-data$cylinders_numeric <- as.numeric(str_extract(data$cylinders, "\\d+"))
+data$cylinders_factor <- factor(str_extract(data$cylinders, "\\d+"))
 
 # Extract Engine Type
 data$engine_type <- str_extract(data$engine, "DOHC|SOHC|Turbo|Twin Turbo|Electric Motor")
@@ -142,11 +142,36 @@ data$fuel_type <- str_extract(data$engine, "Gasoline|Diesel|Electric|Hybrid|Flex
 
 # factor fuel type
 data$fuel_type_factor <- factor(data$fuel_type)
-data$fuel_type_numeric <- as.numeric(data$fuel_type_factor)
 
+# Add <NA> as a valid level in factor types
+data$fuel_type_factor <- addNA(data$fuel_type_factor)
+data$cylinders_factor <- addNA(data$cylinders_factor)
+
+# Rename the <NA> level to "NA"
+levels(data$fuel_type_factor)[is.na(levels(data$fuel_type_factor))] <- "NA"
+levels(data$cylinders_factor)[is.na(levels(data$cylinders_factor))] <- "NA"
+
+data$fuel_type_numeric <- as.numeric(data$fuel_type_factor)
+data$cylinders_numeric <- as.numeric(data$cylinders_factor)
+
+# numeric value assigned:fuel_type_factor (to get it back)
+fuel_type_mapping <- setNames(
+  levels(data$fuel_type_factor),
+  unique(data$fuel_type_numeric)
+)
+
+# numeric value assigned:cylinder_factor
+cylinders_mapping <- setNames(
+  1:length(levels(data$cylinders_factor)),
+  levels(data$cylinders_factor)
+)
+
+unique(data$fuel_type_numeric)
+fuel_type_mapping
+cylinders_mapping
 #deleting the engine column because we have extracted all the information 
 data$engine = NULL
-#colnames(data)
+# colnames(data)
 ```
 
 Corrected the spelling of mileage from milage to mileage. Removed mi. and , to enable numeric operations
@@ -155,6 +180,63 @@ colnames(data)[colnames(data) == "milage"] <- "mileage"
 data$mileage <- as.numeric(gsub("[,]| mi\\.", "", data$mileage))
 ```
 
+#Analyzing categorical variables
+
+```{r}
+# num model and num brand are too large so will just omit 
+length(table(data$brand)) # 57
+length(unique(data$model))
+length(unique(data$transmission)) # 61
+
+# calculate the counts for brand
+brandcounts <- table(data$brand)
+
+barplot(brandcounts,
+  main = "Histogram of brand",
+  xlab = "brand",
+  ylab = "Count",
+  col = "skyblue",
+  las = 2) 
+
+# calculate the counts for transmission
+trancounts <- table(data$transmission)
+
+barplot(trancounts,
+  main = "Histogram of transmission",
+  xlab = "transmission",
+  ylab = "Count",
+  col = "skyblue",
+  las = 2) 
+
+summary(data)
+```
+
+```{r}
+result <- data %>%
+  group_by(transmission) %>%
+  summarise(
+    medianprice = median(price),
+    averageprice = mean(price),
+    count = n()
+  )
+result_sorted <- result %>%
+  arrange(desc(count))
+print(result_sorted)
+threshold <- quantile(result_sorted$count, 0.9)
+threshold
+print(colnames(result_sorted))
+significant_transmissions <- result_sorted$transmission[result_sorted$count > threshold]
+print(significant_transmissions)
+sum(is.na(data$transmission))
+```
+
+After looking at histograms for both Brand and Transmission, it seems Brand is more uniformly distributed while Transmission has a few salient categories. After exploring the categories of transmissions we found that the top 6 most frequent transmissions account for approximately 67-70% of the data points. Therefore we will one hot encode these 6 categories + an "Other" category for Transmission. 
+
+# One-hot encoding categorical variables 
+
+Transmission, fuel_type should 
+
+cylinders we will just keep as numeric
 
 #Analyzing Null/Empty Values 
 We will first look at the problem with NA and Empty values, something that this dataset has a lot of. We will first handle both NA and Empty "" values by replacing them to "NA" to make it easier to preprocess and analyze.  
@@ -164,9 +246,73 @@ empty_string_columns <- colSums(data == "") > 0
 columns_with_na_or_empty <- na_columns | empty_string_columns
 print(names(data)[columns_with_na_or_empty])
 
-data[data == "" | is.na(data)] <- "NA"
+# data[data == "" | is.na(data)] <- "NA"
+# summary(data)
+# unique(data$horsepower)
+# unique(data$displacement)
+# unique(data$cylinders_numeric)
+unique(data$fuel_type_factor)
+unique(data$fuel_type_numeric)
+unique(data$horsepower)
+unique(data$displacement)
+unique(data$cylinders_factor)
+unique(data$cylinders_numeric)
+sum(is.na(data$horsepower))
+sum(is.na(data$displacement))
+table(data$displacement)
 ```
-There are three columns with empty strings/NA values. Let's examine all three of them to discover if we can find any patterns. 
+There are five columns with empty strings/NA values. Let's examine all five of them to discover if we can find any patterns. 
+
+## horsepower 
+
+```{r}
+# number of unique values in horsepower
+length(table(data$horsepower))
+
+# number of null values in horsepower
+sum(is.na(data$horsepower))
+
+# calculate the counts for horsepower
+horsepower_counts <- table(data$horsepower)
+
+barplot(horsepower_counts,
+  main = "Histogram of Horsepower",
+  xlab = "Horsepower",
+  ylab = "Count",
+  col = "skyblue",
+  las = 2) 
+
+# median imputation 
+data$horsepower[is.na(data$horsepower)] <- median(data$horsepower, na.rm = TRUE)
+```
+
+Since there are 348 unique values in horsepower, we can consider horsepower as a continuous variable rather than categorical. However, there are 810 null values in a dataset with 4009 entries which is over 20% null values. This is too many to simply drop, so we want to perform some form of imputation. Looking at the distribution of horsepowers, we can see that the median is a good representative approximation for the distribution so we will use **median imputation**.
+
+## displacement (engine size)
+
+```{r}
+# number of unique values in displacement
+# table(data$displacement)
+length(table(data$displacement))
+
+# number of null values in displacement
+sum(is.na(data$displacement))
+
+# calculate the counts for horsepower
+displacement_counts <- table(data$displacement)
+
+barplot(displacement_counts,
+  main = "Histogram of Displacement",
+  xlab = "Displacement",
+  ylab = "Count",
+  col = "skyblue",
+  las = 2) 
+
+# median imputation 
+data$displacement[is.na(data$displacement)] <- median(data$displacement, na.rm = TRUE)
+```
+
+There are 61 unique values in displacement (engine size). Although these appear to be discretized measurements (ex: size = 0.8 or size = 3.71 may not make sense), we can treat it as a more continuous predictor for now. There are 396 null values in displacement which is just under 10% null values, so we could consider dropping these. However since the median already exists in the dataset (median = 3.5) we can also proceed with median imputation which is what we did. 
 
 ```{r}
 result <- data %>%
@@ -177,8 +323,13 @@ result <- data %>%
     count = n()
   )
 print(result)
+unique(data$fuel_type_factor)
 ```
 The NA values for fuel_type have a higher median price and average price than other types, and makes up a significant count of observations so we are going to treat it as a separate category.
+
+```{r}
+data$accident[data$accident == "NA"] <- "None "
+```
 
 ```{r}
 result <- data %>%
@@ -195,7 +346,7 @@ The NA/Empty values for accident exhibit very similar properties to the None rep
 data$accident[data$accident == "NA"] <- "None reported"
 #unique(data$accident)
 data$accident <- ifelse(data$accident == "At least 1 accident or damage reported", 1, 0)
-#unique(data$accident)
+# unique(data$accident)
 ```
 
 ```{r}
@@ -232,11 +383,10 @@ print(paste("Number of outliers: ", nrow(outliers), "and average price of these 
 data <- data[!(data$price < lower_bound | data$price > upper_bound), ]
 ```
 
+We remove outliers with 1.5*IQR value. 
+
 #need feature idengtifrication and analysis for categorical and numerical variables 
 #One hot encoding for our categorical variables 
-```{r}
-table(data$fuel_type)
-```
 
 LEFTOVER of brians stuff
 ```{r}
@@ -261,9 +411,12 @@ summary(data)
 ```
 
 ## pca?
-WILLY STUFF???
+WILLY STUFF
 ```{r}
-# remove null values
+datan <- data[c("model_year", "mileage", "accident", "clean_title", "horsepower", "displacement", "cylinders_factor", "fuel_type_factor", "price")]
+summary(datan)
+colSums(is.na(datan))
+# remove null values but there should be none
 data_cleaned <- na.omit(datan) # almost 1000
 head(data_cleaned)
 dim(data_cleaned)
@@ -292,7 +445,7 @@ plot(scores[, 1], scores[, 2],
 # pca_result <- prcomp(clean_no_price, center = TRUE, scale. = TRUE)
 
 ```
-END OF WILLY STUFF?
+END OF WILLY STUFF
 
 ## Unsupervised Learning 
 Apply at least three clustering algorithms to the processed dataset.
@@ -448,7 +601,6 @@ Training our 3 models
 lasso_model <- train(x = xtrain_scaled, y = ytrain, method = "glmnet", trControl = train_control, tuneGrid = lasso_grid)
 ridge_model <- train(x = xtrain_scaled, y = ytrain, method = "glmnet", trControl = train_control, tuneGrid = ridge_grid)
 elastic_net_model <- train(x = xtrain_scaled, y = ytrain, method = "glmnet", trControl = train_control, tuneGrid = elastic_net_grid)
-
 ```
 
 Finding the best tuning parameters for all of them 
