@@ -870,7 +870,7 @@ lassomodel = cv.glmnet(x = X, y = y, nfolds = 10, alpha = 1)
 
 Let's do the task of selecting three cars from your dataset and estimating their price as if they were new. Let's first select a random toyota car 
 ```{r, echo=FALSE}
-set.seed(1)
+set.seed(432)
 entiredata <- read.csv("used_cars.csv")
 toyota_car <- entiredata[entiredata$brand == "Toyota", ]
 toyota_car <- toyota_car[sample(nrow(toyota_car), 1), ]
@@ -892,7 +892,63 @@ toyota_new <- data.frame(
   Age = 0
 )
 
-pred_toyota_new <- predict(lassomodel, newx = as.matrix(toyota_new))
+pred_toyota_new <- predict(lassomodel, newx = as.matrix(toyota_new), s = "lambda.min")
 print(paste("the new price is ", pred_toyota_new))
 
 ```
+
+This car's original MSRP was approxmiately 40,395. Our model predicted the car to be around 4k higher than the actual price. The discrpeneices could be due to various different features. 
+
+```{r, echo = FALSE}
+set.seed(432)
+ford_car <- entiredata[entiredata$brand == "Ford", ]
+ford_car <- ford_car[sample(nrow(ford_car), 1), ]
+#print("Randomly picked Toyota Car:", toyota_car$model)
+#print("Year of model:", toyota_car$model_year)
+ford_car
+
+ford_new <- data.frame(
+  brand.Audi = 0,
+  brand.BMW = 0,
+  brand.Chevrolet = 0,
+  brand.Ford = 1,
+  brand.Mercedes.Benz = 0,
+  brand.Porsche = 0,
+  brand.Toyota = 0,
+  mileage = 0,
+  accident = 0,
+  clean_title = 1,
+  Age = 0
+)
+
+pred_toyota_new <- predict(lassomodel, newx = as.matrix(ford_new), s = "lambda.min")
+pred_toyota_new
+```
+The actual price of a new Ford Maverick XLT at the time is 29,541.47
+
+
+```{r, echo = FALSE}
+set.seed(432)
+porsche_car <- entiredata[entiredata$brand == "Porsche", ]
+porsche_car <- porsche_car[sample(nrow(porsche_car), 1), ]
+porsche_car 
+
+porsche_new <- data.frame(
+  brand.Audi = 0,
+  brand.BMW = 0,
+  brand.Chevrolet = 0,
+  brand.Ford = 0,
+  brand.Mercedes.Benz = 0,
+  brand.Porsche = 1,
+  brand.Toyota = 0,
+  mileage = 0,
+  accident = 0,
+  clean_title = 1,
+  Age = 0
+)
+  
+pred_porsche_new <- predict(lassomodel, newx = as.matrix(porsche_new), s = "lambda.min")
+pred_porsche_new
+```
+
+The actual price of a porsche 718 spyder base 2022 model is approximiately 98,300 dollars. 
