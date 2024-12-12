@@ -516,38 +516,51 @@ There seems to be a pretty solid relationship between a more recent model_year a
 
 Next, we will try hierarchical clustering with three different linkage methods(single, complete, and average) using euclidean distance. Hierarchical Clustering begins with each data point starting as its own cluster. The goal is to progressively group them together until there is only one group. The process involves choosing the closest two groups, calculated through a specific distance metric. 
 ```{r}
-set.seed(1)
-numeric_data <- data[, sapply(data, is.numeric)]
+numeric_data <- data[, c("model_year", "price")]
+#numeric_data <- data[, sapply(data, is.numeric)]
 numeric_data_without_price <- numeric_data[, !colnames(numeric_data) %in% "price"]
-
-hclust_single <- hclust(dist(numeric_data_without_price, method = "euclidean"), method = "single")
-hclust_complete <- hclust(dist(numeric_data_without_price, method = "euclidean"), method = "complete")
-hclust_average <- hclust(dist(numeric_data_without_price, method = "euclidean"), method = "average")
-
-par(mfrow = c(1, 3))
-plot(hclust_single, main = "Single Linkage", xlab = "", sub = "", cex = 0.6)
-plot(hclust_complete, main = "Complete Linkage", xlab = "", sub = "", cex = 0.6)
-plot(hclust_average, main = "Average Linkage", xlab = "", sub = "", cex = 0.6)
-par(mfrow = c(1, 1))
-
+numeric_data_without_price_scaled <- scale(numeric_data_without_price)
 ```
+Removing non-numeric features as clustering requires numeric features. Also, removed the target feature price.
 
 ```{r}
 
-clusters_complete <- cutree(hclust_complete, k = 4)
+# Perform hierarchical clustering with scaled data
+hclust_single <- hclust(dist(numeric_data_without_price_scaled, method = "euclidean"), method = "single")
+hclust_complete <- hclust(dist(numeric_data_without_price_scaled, method = "euclidean"), method = "complete")
+hclust_average <- hclust(dist(numeric_data_without_price_scaled, method = "euclidean"), method = "average")
+
+# Plot the dendrograms
+par(mfrow = c(1, 3))  # Arrange plots side by side
+plot(hclust_single, main = "Single Linkage", xlab = "", sub = "", cex = 0.6)
+plot(hclust_complete, main = "Complete Linkage", xlab = "", sub = "", cex = 0.6)
+plot(hclust_average, main = "Average Linkage", xlab = "", sub = "", cex = 0.6)
+par(mfrow = c(1, 1))  # Reset plotting layout
 
 
-data$cluster <- as.factor(clusters_complete)
+```
 
 
+
+```{r}
+# Cut the dendrogram into 4 clusters using single linkage
+clusters_single <- cutree(hclust_single, k = 2)
+
+# Assign cluster labels to the dataset
+data$cluster <- as.factor(clusters_single)
+
+# View the cluster sizes
 table(data$cluster)
+
+# Summarise cluster statistics
+library(dplyr)
 
 cluster_summary <- data %>%
   group_by(cluster) %>%
   summarise(
     avg_price = mean(price, na.rm = TRUE),
     avg_model_year = mean(model_year, na.rm = TRUE),
-    avg_accident = mean(as.numeric(accident), na.rm = TRUE),  # Replace with proper numeric conversion if needed
+    avg_accident = mean(as.numeric(accident), na.rm = TRUE),  # Convert accident to numeric if necessary
     avg_mileage = mean(mileage, na.rm = TRUE),
     avg_horsepower = mean(horsepower, na.rm = TRUE),
     count = n()
@@ -565,8 +578,10 @@ print(cluster_summary)
 Finally, we will try spectral clustering, which aims to group observations based on their proximity information. This method involves 2 main steps, the first being using the eigenvalues of a similarity matrix to perform dimension reduction, followed by applying a clustering algorithm like K-means. 
 
 ```{r}
-set.seed(1)
-specc_result <- specc(as.matrix(train[, -1]), centers = 3, kernel = "rbfdot")
+
+
+
+
 ```
 
 
