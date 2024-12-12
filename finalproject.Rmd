@@ -100,7 +100,7 @@ Citations:
 ## Data Processing and Summary Statistics 
 
 First, we will import the dataset and libraries into our workspace 
-```{r}
+```{r, include=FALSE}
 library(caret)
 library(ggplot2)
 library(MASS)
@@ -119,18 +119,18 @@ data <- read.csv("used_cars.csv")
 
 #Preliminary Data Cleaning/Modifications
 First, we will removed the dollar sign and comma in price to enable numeric operations
-```{r}
+```{r, echo=FALSE}
 data$price <- as.numeric(gsub("[$,]", "", data$price))
 ```
 
 Corrected the spelling of mileage from milage to mileage. Removed mi. and , to enable numeric operations. 
-```{r}
+```{r, echo=FALSE}
 colnames(data)[colnames(data) == "milage"] <- "mileage"
 data$mileage <- as.numeric(gsub("[,]| mi\\.", "", data$mileage))
 ```
 
 The Engine columns contains very useful information such as the horsepower, displacement, cylinders, engine type, and fuel type. We turn these all into new columns. 
-```{r}
+```{r, echo=FALSE}
 # Extract Horsepower (HP)
 data$horsepower <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=HP)"))
 
@@ -153,7 +153,7 @@ data$engine = NULL
 head(data)
 ```
 Looking at each column's type and unique count 
-```{r}
+```{r, echo=FALSE}
 sapply(data, class)
 sapply(data, function(col) {
   if (is.character(col)) {
@@ -165,7 +165,7 @@ sapply(data, function(col) {
 ```
 
 Let's examine columns that include NA or Empty String entries. 
-```{r}
+```{r, echo=FALSE}
 na_columns <- colSums(is.na(data)) > 0
 empty_string_columns <- colSums(data == "") > 0
 columns_with_na_or_empty <- na_columns | empty_string_columns
@@ -178,7 +178,7 @@ Categorical variables with various unique values include brand, model, transmiss
 First, we look at the "brand" and the "model" columns. Through analysis shown below, we have decided to omit both of these columns. Our reasoning and visualizations are shown below. 
 
 There are 57 unique brands with the frequency histogram not showing much dominance in a certain brand. To reduce the dimensionality, we will just omit this column 
-```{r}
+```{r, echo=FALSE}
 length(unique(data$brand)) 
 # calculate the counts for brand
 brandcounts <- table(data$brand)
@@ -203,7 +203,7 @@ print(result_sorted)
 data$brand = NULL
 ```
 This problem is seen even more in the model column. We also omit this column from the dataset 
-```{r}
+```{r, echo=FALSE}
 length(unique(data$model))
 modelcounts <- table(data$model)
 barplot(modelcounts,
@@ -218,7 +218,7 @@ data$model = NULL
 ```
 
 Now, let's examine colors. There are both intcol and extcol variables. Having too many unique color names can introduce noise into your classification model and make it harder for the model to generalize effectively. Grouping the colors into broader, more general categories can help improve model performance by reducing the dimensionality of the feature and making patterns more apparent.
-```{r}
+```{r, echo=FALSE}
 # Define the mapping function
 generalize_colors <- function(color_name) {
   # Convert to lowercase for uniformity
@@ -243,7 +243,7 @@ generalize_colors <- function(color_name) {
 }
 ```
 
-```{r}
+```{r, echo=FALSE}
 length(unique(data$ext_col))
 extcolorcounts <- table(data$ext_col)
 barplot(extcolorcounts,
@@ -254,14 +254,14 @@ barplot(extcolorcounts,
   las = 2) 
 ```
 Let's apply the generalization function to simply the different colors
-```{r}
+```{r, echo=FALSE}
 data$ext_col <- sapply(data$ext_col, generalize_colors)
 unique(data$ext_col)
 ```
 
 
 The same thing happens to int_col, but looking at the dataset we will have 4 categories. 
-```{r}
+```{r, echo=FALSE}
 length(unique(data$int_col))
 intcolorcounts <- table(data$int_col)
 barplot(intcolorcounts,
@@ -284,7 +284,7 @@ unique(data$int_col)
 ```
 
 Examining the transmission column now 
-```{r}
+```{r, echo=FALSE}
 length(unique(data$transmission))
 # calculate the counts for transmission
 trancounts <- table(data$transmission)
@@ -318,7 +318,7 @@ After looking at histograms for both Brand and Transmission, it seems Brand is m
 
 ## Transmission
 
-```{r}
+```{r, echo=FALSE}
 # map transmissions to just the top 7 or Other. could make this function take in significant_transmissions too for extensibility
 map_transmission <- function(transmission) {
   primary_transmissions <- c(
@@ -344,7 +344,7 @@ data$transmission <- sapply(data$transmission, map_transmission)
 
 #Analyzing Null/Empty Values 
 We will first look at the problem with NA and Empty values, something that this dataset has a lot of. We will first handle both NA and Empty "" values by replacing them to "NA" to make it easier to preprocess and analyze.  
-```{r}
+```{r, echo=FALSE}
 na_columns <- colSums(is.na(data)) > 0
 empty_string_columns <- colSums(data == "") > 0
 columns_with_na_or_empty <- na_columns | empty_string_columns
@@ -370,7 +370,7 @@ There are five columns with empty strings/NA values. Let's examine all five of t
 
 ## horsepower 
 
-```{r}
+```{r, echo=FALSE}
 # number of unique values in horsepower
 length(table(data$horsepower))
 
@@ -397,7 +397,7 @@ Since there are 348 unique values in horsepower, we can consider horsepower as a
 
 ## displacement (engine size)
 
-```{r}
+```{r, echo=FALSE}
 # number of unique values in displacement
 # table(data$displacement)
 length(table(data$displacement))
@@ -423,7 +423,7 @@ sum(is.na(data$displacement))
 
 There are 61 unique values in displacement (engine size). Although these appear to be discretized measurements (ex: size = 0.8 or size = 3.71 may not make sense), we can treat it as a more continuous predictor for now. There are 396 null values in displacement which is just under 10% null values, so we could consider dropping these. However since the median already exists in the dataset (median = 3.5) we can also proceed with median imputation which is what we did. 
 
-```{r}
+```{r, echo=FALSE}
 result <- data %>%
   group_by(fuel_type) %>%
   summarise(
@@ -438,7 +438,7 @@ data$fuel_type[is.na(data$fuel_type)] <- "NA"
 The NA values for fuel_type have a higher median price and average price than other types, and makes up a significant count of observations so we are going to treat it as a separate category.
 
 #cylinder 
-```{r}
+```{r, echo=FALSE}
 result <- data %>%
   group_by(cylinders) %>%
   summarise(
@@ -451,7 +451,7 @@ data$cylinders[is.na(data$cylinders)] <- "NA"
 ```
 
 #accident 
-```{r}
+```{r, echo=FALSE}
 result <- data %>%
   group_by(accident) %>%
   summarise(
@@ -462,14 +462,14 @@ result <- data %>%
 print(result)
 ```
 The NA/Empty values for accident exhibit very similar properties to the None reported category, with median price and average price being pretty similar, not to mention a very small percentage of data is represented by this value. Therefore, we replace and combine these observations with the None reported category. Because accident only has 2 unique values now, no accidents and 1 or more accidents, we changed it to 1,0 to be useful for models. 
-```{r}
+```{r, echo=FALSE}
 data$accident[data$accident == "NA"] <- "None reported"
 #unique(data$accident)
 data$accident <- ifelse(data$accident == "At least 1 accident or damage reported", 1, 0)
 # unique(data$accident)
 ```
 
-```{r}
+```{r, echo=FALSE}
 result <- data %>%
   group_by(clean_title) %>%
   summarise(
@@ -481,13 +481,13 @@ print(result)
 ```
 
 The NA values for clean_title clearly have a significantly higher median price and will be treated as a separate category. We apply similar reasoning from accident to clean_title. Since there is only "Yes" and NA, we treat all the yes's to 1 and all the NA values to 0.
-```{r}
+```{r, echo=FALSE}
 data$clean_title <-ifelse(data$clean_title == "Yes", 1, 0)
 unique(data$clean_title)
 ```
 
 #engine type 
-```{r}
+```{r, echo=FALSE}
 # calculate the counts for horsepower
 engine_counts <- table(data$engine_type)
 
@@ -512,7 +512,7 @@ data$engine_type[is.na(data$engine_type)] <- "NA"
 
 #Removing Outliers 
 We remove outliers with 1.5*IQR value.
-```{r}
+```{r, echo=FALSE}
 Q1 <- quantile(data$price, 0.25, na.rm = TRUE)
 Q3 <- quantile(data$price, 0.75, na.rm = TRUE)
 IQR_value <- IQR(data$price, na.rm = TRUE)
@@ -528,25 +528,25 @@ print(paste("Number of outliers: ", nrow(outliers), "and average price of these 
 data <- data[!(data$price < lower_bound | data$price > upper_bound), ]
 ```
 
-```{r}
+```{r, echo=FALSE}
 summary(data)
 ```
 #turning each categorial column into a factor type 
-```{r}
+```{r, echo=FALSE}
 data[sapply(data, is.character)] <- lapply(data[sapply(data, is.character)], as.factor)
 ```
 
 
 #one hot encoding
 Some models will require one hot encoding. For these models, we create a new dataset and apply this one hot encoding 
-```{r}
+```{r, echo=FALSE}
 dummy_model <- dummyVars(~ ., data = data)
 data_one_hot <- as.data.frame(predict(dummy_model, newdata = data))
 ```
 
 
 #Final Summary Statistics
-```{r}
+```{r, echo=FALSE}
 dim(data_one_hot)
 summary(data_one_hot)
 ```
@@ -557,14 +557,14 @@ Determine the appropriate number of clusters and discuss the interpretability of
 Examine whether the clustering results are associated with your outcome variable.
 
 1. KMeans Clustering 
-```{r}
+```{r, echo=FALSE}
 data_subset <- data[, c("model_year", "price")]
 data_subset <- na.omit(data_subset)
 data_subset_scaled <- scale(data_subset)
 ```
 We decided to use kmeans to examine the relation between model_year and price, as we noticed a similar examination in one of the papers while doing the literature review. Because K-means utilizes distance metrics, we scale the data before clustering.
 
-```{r}
+```{r, echo=FALSE}
 set.seed(1)
 
 sil_scores <- sapply(2:10, function(k) {
@@ -583,7 +583,7 @@ plot(2:10, sil_scores, type = "b", pch = 19, frame = FALSE,
 We decided to use the Silhouette Method to determine the optimal number of clusters. This method essentially uses distance measures calculating how close clusters are to themselves and how far away they are to other clusters to judge the optimal number of clusters. In this case, 2 has the highest average silhouette score so we will use k=2.
 
 
-```{r}
+```{r, echo=FALSE}
 set.seed(1)  
 
 kmeans_result <- kmeans(data_subset_scaled, centers = 2)
@@ -604,7 +604,7 @@ There seems to be a pretty solid relationship between a more recent model_year a
 2. Hierarchical Clustering 
 
 Next, we will try hierarchical clustering with three different linkage methods(single, complete, and average) using euclidean distance. Hierarchical Clustering begins with each data point starting as its own cluster. The goal is to progressively group them together until there is only one group. The process involves choosing the closest two groups, calculated through a specific distance metric. 
-```{r}
+```{r, echo=FALSE}
 #numeric_data <- data[, c("model_year", "price")]
 numeric_data <- data[, sapply(data, is.numeric)]
 numeric_data_without_price <- numeric_data[, !colnames(numeric_data) %in% "price"]
@@ -612,7 +612,7 @@ numeric_data_without_price <- numeric_data[, !colnames(numeric_data) %in% "price
 ```
 Removing non-numeric features as clustering requires numeric features. Also, removed the target feature price.
 
-```{r}
+```{r, echo=FALSE}
 
 # Perform hierarchical clustering with scaled data
 hclust_single <- hclust(dist(numeric_data_without_price, method = "euclidean"), method = "single")
@@ -631,7 +631,7 @@ par(mfrow = c(1, 1))  # Reset plotting layout
 
 
 
-```{r}
+```{r, echo=FALSE}
 # Cut the dendrogram into 2 clusters using complete linkage
 clusters_complete <- cutree(hclust_complete, k = 2)
 
@@ -669,7 +669,7 @@ There are a lot of correlations here that make sense between the 2 clusters. Clu
 
 Finally, we will try spectral clustering, which aims to group observations based on their proximity information. This method involves 2 main steps, the first being using the eigenvalues of a similarity matrix to perform dimension reduction, followed by applying a clustering algorithm like K-means. 
 
-```{r}
+```{r, echo=FALSE}
 
 # Step 1: Prepare and scale data
 # Select numeric columns only
@@ -721,7 +721,7 @@ Similar to Cluster 1, with a more recent avg_model_year, also has a lower avg_mi
 ## Prediction Models 
 
 For all the supervised models below, we will split the data into training sets for model training and testing sets to evaluate performance and accuracy
-```{r}
+```{r, echo=FALSE}
 y = data_one_hot$price
 X <- data_one_hot[, !(colnames(data_one_hot) %in% "price")]
 #test_idx = sample(nrow(data), size = 0.2 * nrow(data))
@@ -745,11 +745,11 @@ head(xtrain)
 1. Linear Model. There are mainly three possible linear models: Lasso, Ridge, and Elastic Net. We will try all three models and see which one performs the best. Lasso, Ridge, and Elastic Net all benefit from feature scaling because these models involve regularization. which will penalize the size of coefficients of the model to avoid overfitting. All 3 models also involving a tuning parameter, and so we will use k-fold cross validation to find the best parameters. cv.glmnet will automatically scale and center the data as well. 
 
 Training our ridge model 
-```{r}
+```{r, echo=FALSE}
 ridgemodel = cv.glmnet(x = as.matrix(xtrain), y = ytrain, nfolds = 10, alpha = 0)
 ```
 
-```{r}
+```{r, echo=FALSE}
 ridgemodel$lambda.min
 
 pred = predict(ridgemodel, newx = as.matrix(xtest), s = "lambda.min")
@@ -757,11 +757,11 @@ sqrt(mean((pred - ytest)^2))
 ```
 
 Training our lasso model 
-```{r}
+```{r, echo=FALSE}
 lassomodel = cv.glmnet(x = as.matrix(xtrain), y = ytrain, nfolds = 10, alpha = 1)
 ```
 
-```{r}
+```{r, echo=FALSE}
 lassomodel$lambda.min
 
 pred = predict(lassomodel, newx = as.matrix(xtest), s = "lambda.min")
@@ -769,11 +769,11 @@ sqrt(mean((pred - ytest)^2))
 ```
 
 Training our elastic net model 
-```{r}
+```{r, echo=FALSE}
 elastic_net_model <- cv.glmnet(x = as.matrix(xtrain), y = ytrain, nfolds = 10, alpha = 0.5)
 ```
 
-```{r}
+```{r, echo=FALSE}
 elastic_net_model$lambda.min
 
 pred1 = predict(elastic_net_model, newx = as.matrix(xtest), s = "lambda.min")
@@ -784,7 +784,7 @@ Out of our 3 linear models, Ridge performed the best, with a RMSE of 12261.19
 
 
 2. K Nearest Neighbors(KNN) regression works by calculating the k nearest training set data points to the test point and predicting the target value by taking the average of their target values. KNN is sensitive to feature scaling, so we will need to scale the data. The reason behind this is for example, if one feature has ranges from 1-10 and another one has 1-10000, distance calcualtions will be biased and results will suffer as a result. KNN is also sensitive to the choice of k. To find the optimal value of k, we will perform k-fold cross validation. 
-```{r}
+```{r, echo=FALSE}
 set.seed(1)
 
 # 2. Scale the numeric columns
@@ -819,7 +819,7 @@ plot(knn.cvfit)
 print(paste("The best value of k based on cross-validation is: ", knn.cvfit$bestTune$k))
 ```
 
-```{r}
+```{r, echo=FALSE}
 # Train the final model using the best value of k and find the predictions
 best_k <- knn.cvfit$bestTune$k
 knn_predictions <- knn(train = xtrain_processed, test = xtest_processed, cl = ytrain, k = best_k)
@@ -847,7 +847,7 @@ To solve this problem, we will follow a similar approach by building a machine l
 The task of estimating brand new car prices using only a dataset of used car data can be challenging. The biggest limitating factor is that because the model has never actually seen cars at zero age and zero mileage, it has to infer and extrapolate what the car might have cost when it was first bought, leading to potential inaccuracies. There are also a lot of other external factors that the dataset doesn't capture, such as inflation, competition, technological advancements, and special promotions all have the ability to shift pricing strategies and patterns. For example, a certain used car's price might have been during a time of inflation, which may not align with the pricing logic for the car's original release date. 
 
 To avoid model complexity that arises from having to one-hot encoding every single brand and practicality reasons, we will train our model on a subset of the data, mainly used cars that belong to the 7 most common brands in the dataset: Ford, BMW, Mercedes-Benz, Chevrolet, Porsche, Audi, Toyota. This is a good mix of both luxary and economy brands. 
-```{r}
+```{r, echo=FALSE}
 data <- read.csv("used_cars.csv")
 data <- data %>%
   select(brand, model_year, milage, accident, clean_title, price)
@@ -871,14 +871,14 @@ sapply(data_one_hot, class)
 ```
 
 lasso model 
-```{r}
+```{r, echo=FALSE}
 X = as.matrix(data_one_hot[, -1])
 y = as.vector(data_one_hot$price)
 lassomodel = cv.glmnet(x = X, y = y, nfolds = 10, alpha = 1)
 ```
 
 Let's do the task of selecting three cars from your dataset and estimating their price as if they were new. Let's first select a random toyota car 
-```{r}
+```{r, echo=FALSE}
 set.seed(1)
 entiredata <- read.csv("used_cars.csv")
 toyota_car <- entiredata[entiredata$brand == "Toyota", ]
@@ -904,22 +904,4 @@ toyota_new <- data.frame(
 pred_toyota_new <- predict(lassomodel, newx = as.matrix(toyota_new))
 print(paste("the new price is ", pred_toyota_new))
 
-```
-```{r}
-ford_car <- entiredata[entiredata$brand == "Porsche", ]
-ford_car <- ford_car[sample(nrow(ford_car), 1), ]
-#print("Randomly picked Toyota Car:", toyota_car$model)
-#print("Year of model:", toyota_car$model_year)
-ford_car
-
-ford_new <- data.frame(
-  brand = factor("Porsche", levels = levels(data$brand)),
-  mileage = 0,
-  accident = 0,
-  clean_title = 1,
-  Age = 0
-)
-
-pred_toyota_new <- predict(rf.fit, ford_new)
-pred_toyota_new
 ```
