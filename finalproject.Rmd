@@ -230,10 +230,11 @@ After looking at histograms for both Brand and Transmission, it seems Brand is m
 
 # One-hot encoding categorical variables 
 
+## Transmission
 Transmission, fuel_type, cylinders 
 
 ```{r}
-# Create a function to map transmissions
+# map transmissions to just the top 7 or Other. could make this function take in significant_transmissions too for extensibility
 map_transmission <- function(transmission) {
   primary_transmissions <- c(
     "A/T", 
@@ -267,10 +268,27 @@ data <- cbind(data, transmission_dummies)
 # factor transmission as well
 
 data$transmission_factored <- factor(data$transmission_)
-
-table(data$transmission_)
-summary(data)
 ```
+
+## cylinders
+```{r}
+# One-hot encoding
+cyl_dummies <- model.matrix(~ cylinders_factor - 1, data = data)
+cyl_dummies <- as.data.frame(cyl_dummies)
+
+colnames(cyl_dummies) <- gsub("cylinders_factor", "cylinder number ", colnames(cyl_dummies))
+
+summary(cyl_dummies)
+
+unique(data$cylinders_factor)
+
+data <- cbind(data, cyl_dummies)
+
+summary(data)
+dim(data)
+```
+
+## fuel_type
 
 #Analyzing Null/Empty Values 
 We will first look at the problem with NA and Empty values, something that this dataset has a lot of. We will first handle both NA and Empty "" values by replacing them to "NA" to make it easier to preprocess and analyze.  
