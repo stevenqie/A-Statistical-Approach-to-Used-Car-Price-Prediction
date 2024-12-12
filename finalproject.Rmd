@@ -174,10 +174,11 @@ data$engine = NULL
 # colnames(data)
 ```
 
-Corrected the spelling of mileage from milage to mileage. Removed mi. and , to enable numeric operations
+Corrected the spelling of mileage from milage to mileage. Removed mi. and , to enable numeric operations. Renamed transmission to transmission_ for readability of one hot encoded dummy variables later.
 ```{r}
 colnames(data)[colnames(data) == "milage"] <- "mileage"
 data$mileage <- as.numeric(gsub("[,]| mi\\.", "", data$mileage))
+colnames(data)[colnames(data) == "transmission"] <- "transmission_"
 ```
 
 #Analyzing categorical variables
@@ -207,13 +208,11 @@ barplot(trancounts,
   ylab = "Count",
   col = "skyblue",
   las = 2) 
-
-summary(data)
 ```
 
 ```{r}
 result <- data %>%
-  group_by(transmission) %>%
+  group_by(transmission_) %>%
   summarise(
     medianprice = median(price),
     averageprice = mean(price),
@@ -222,21 +221,56 @@ result <- data %>%
 result_sorted <- result %>%
   arrange(desc(count))
 print(result_sorted)
-threshold <- quantile(result_sorted$count, 0.9)
-threshold
-print(colnames(result_sorted))
-significant_transmissions <- result_sorted$transmission[result_sorted$count > threshold]
+threshold <- quantile(result_sorted$count, 0.9) # 205.7
+significant_transmissions <- result_sorted$transmission_[result_sorted$count > threshold]
 print(significant_transmissions)
-sum(is.na(data$transmission))
 ```
 
-After looking at histograms for both Brand and Transmission, it seems Brand is more uniformly distributed while Transmission has a few salient categories. After exploring the categories of transmissions we found that the top 6 most frequent transmissions account for approximately 67-70% of the data points. Therefore we will one hot encode these 6 categories + an "Other" category for Transmission. 
+After looking at histograms for both Brand and Transmission, it seems Brand is more uniformly distributed while Transmission has a few salient categories. After exploring the categories of transmissions we found that the top 7 most frequent transmissions account for approximately 67-70% of the data points. Therefore we will one hot encode these 7 categories + an "Other" category for Transmission for a total of 8 transmission categories.
 
 # One-hot encoding categorical variables 
 
-Transmission, fuel_type should 
+Transmission, fuel_type, cylinders 
 
-cylinders we will just keep as numeric
+```{r}
+# Create a function to map transmissions
+map_transmission <- function(transmission) {
+  primary_transmissions <- c(
+    "A/T", 
+    "8-Speed A/T", 
+    "Transmission w/Dual Shift Mode", 
+    "6-Speed A/T", 
+    "6-Speed M/T", 
+    "Automatic", 
+    "7-Speed A/T"
+  )
+  
+  if (transmission %in% primary_transmissions) {
+    return(transmission)
+  } else {
+    return("Other")
+  }
+}
+
+# Apply the mapping function
+data$transmission_ <- sapply(data$transmission_, map_transmission)
+
+# One-hot encoding
+transmission_dummies <- model.matrix(~ transmission_ - 1, data = data)
+transmission_dummies <- as.data.frame(transmission_dummies)
+
+summary(transmission_dummies)
+
+# Add the dummy columns to the original dataframe
+data <- cbind(data, transmission_dummies)
+
+# factor transmission as well
+
+data$transmission_factored <- factor(data$transmission_)
+
+table(data$transmission_)
+summary(data)
+```
 
 #Analyzing Null/Empty Values 
 We will first look at the problem with NA and Empty values, something that this dataset has a lot of. We will first handle both NA and Empty "" values by replacing them to "NA" to make it easier to preprocess and analyze.  
