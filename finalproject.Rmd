@@ -727,11 +727,6 @@ For all the supervised models below, we will split the data into training sets f
 ```{r, echo=FALSE}
 y = data_one_hot$price
 X <- data_one_hot[, !(colnames(data_one_hot) %in% "price")]
-#test_idx = sample(nrow(data), size = 0.2 * nrow(data))
-#xtrain = X[ -test_idx, ]
-#xtest  = X[ test_idx, ]
-#ytrain = y[ -test_idx ]
-#ytest  = y[ test_idx ]
 
 sample <- sample(c(TRUE, FALSE), nrow(data), replace=TRUE, prob=c(0.8, 0.2))
 xtrain <- X[sample, ]
@@ -739,10 +734,6 @@ xtest <- X[!sample, ]
 ytrain = y[sample]
 ytest = y[!sample] 
 
-#as.matrix(xtrain)
-#sum(is.na(xtrain)
-#colnames(xtrain)
-head(xtrain)
 ```
 
 1. Linear Model. There are mainly three possible linear models: Lasso, Ridge, and Elastic Net. We will try all three models and see which one performs the best. Lasso, Ridge, and Elastic Net all benefit from feature scaling because these models involve regularization. which will penalize the size of coefficients of the model to avoid overfitting. All 3 models also involving a tuning parameter, and so we will use k-fold cross validation to find the best parameters. cv.glmnet will automatically scale and center the data as well. 
@@ -882,7 +873,7 @@ lassomodel = cv.glmnet(x = X, y = y, nfolds = 10, alpha = 1)
 
 Let's do the task of selecting three cars from your dataset and estimating their price as if they were new. Let's first select a random toyota car 
 ```{r, echo=FALSE}
-set.seed(1)
+set.seed(432)
 entiredata <- read.csv("used_cars.csv")
 toyota_car <- entiredata[entiredata$brand == "Toyota", ]
 toyota_car <- toyota_car[sample(nrow(toyota_car), 1), ]
@@ -904,7 +895,7 @@ toyota_new <- data.frame(
   Age = 0
 )
 
-pred_toyota_new <- predict(lassomodel, newx = as.matrix(toyota_new))
+pred_toyota_new <- predict(lassomodel, newx = as.matrix(toyota_new), s = "lambda.min")
 print(paste("the new price is ", pred_toyota_new))
 
 ```
