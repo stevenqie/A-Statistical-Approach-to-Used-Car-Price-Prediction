@@ -105,6 +105,8 @@ library(dplyr)
 library(class)
 library(e1071)
 library(caret)
+library(rpart)
+library(rpart.plot)
 
 # Load necessary libraries
 
@@ -810,6 +812,70 @@ svm_predictions <- predict(svm_model, newdata = as.matrix(xtest))
 #RMSE Calculation
 svm_rmse <- sqrt(mean((svm_predictions - ytest)^2)) #outputs 11054.76
 ```
+
+### 4. Regression Trees
+
+Regression trees are another supervised machine learning algorithm that involves splitting the data into groups based on predictors, favoring homogeneity within each leaf. Again, we use RMSE to evaluate the performance since that metric is directly comparable with other models. Parameter tuning was done with standard grid search over the 3 parameters of cp, minsplit, and maxdepth. 
+
+- cp (complexity parameter) controls the size of the tree by penalizing splits that do not significantly reduce the error.
+- minsplit determines the minimum number of observations required to attempt a split.
+- maxdepth limits the maximum depth of the tree to prevent overfitting.
+
+Each parameter impacts the model's bias-variance tradeoff: higher cp and smaller maxdepth favor simpler models (higher bias, lower variance), while lower cp and greater maxdepth risk overfitting (lower bias, higher variance). 
+
+```{r echo=FALSE}
+set.seed(1)
+train_index <- createDataPartition(y_factor, p = 0.8, list = FALSE)
+train_data = data[train_index,]
+test_data = data[-train_index, ]
+```
+
+```{r echo=FALSE}
+cp_values <- seq(0.001, 0.05, by = 0.005)
+minsplit_values <- c(10, 20, 30)
+maxdepth_values <- c(5, 10, 15)
+
+results <- data.frame(cp = numeric(), minsplit = integer(), maxdepth = integer(), MSE = numeric())
+
+for (cp in cp_values) {
+  for (minsplit in minsplit_values) {
+    for (maxdepth in maxdepth_values) {
+      model <- rpart(
+        price ~ ., 
+        data = train_data,
+        control = rpart.control(cp = cp, minsplit = minsplit, maxdepth = maxdepth)
+      )
+      
+      # Predict on validation set
+      predictions <- predict(model, test_data)
+      
+      # Calculate MSE
+      mse <- sqrt(mean((test_data$price - predictions)^2))
+      
+      # Store results
+      results <- rbind(results, data.frame(cp = cp, minsplit = minsplit, maxdepth = maxdepth, MSE = mse))
+    }
+  }
+}
+
+best_params <- results[which.min(results$MSE), ]
+
+rpart_model <- rpart(
+        price ~ .,
+        data = train_data,
+        control = rpart.control(cp = best_params$cp, minsplit = best_params$minsplit, maxdepth = best_params$maxdepth)
+      )
+importance <- rpart_model$variable.importance
+
+importance_sorted <- sort(importance, decreasing = TRUE)
+
+barplot(importance_sorted, main = "Variable Importance", col = "blue", las = 2)
+print(best_params)
+```
+
+Our final regression tree model has cp = 0.001, minsplit = 10, and maxdepth = 10. This model achieves an RMSE of 11368.41.
+
+One of the advantages of regression trees is its interpretability. The plot of variable importance shows that the top influenteial variables in descending order are mileage, horsepower, model year, and cylinders. These results also somewhat overlap in the importance of variables between our linear model and random forest.
 
 ### 5. Random Forest 
 Random Forest is another powerful supervised machine learning algorithm that involves building numerous decision trees using different subsets of the data, acquired through a technique called bootstrapping. Again, we use RMSE to evaluate the performance since that metric is directly comparable with other models. Parameter tuning was done with standard grid search over the 3 parameters of ntree, mtry, and nodesize. 
