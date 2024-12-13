@@ -1,8 +1,7 @@
 ---
 title: "A Statistical Approach to Used Car Price Prediction"
-output:
+output: 
   pdf_document: default
-  word_document: default
 date: "12/09/2024"
 header-includes:
 - \usepackage{multicol}
@@ -14,6 +13,8 @@ header-includes:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=7, fig.height=3)
+
 ```
 
 \begin{multicols}{3}
@@ -99,7 +100,7 @@ Citations:
 
 ## Data Processing and Summary Statistics 
 
-First, we will import the dataset and libraries into our workspace 
+
 ```{r, include=FALSE}
 library(caret)
 library(ggplot2)
@@ -117,20 +118,22 @@ library(class)
 data <- read.csv("used_cars.csv")
 ```
 
-#Preliminary Data Cleaning/Modifications
-First, we will removed the dollar sign and comma in price to enable numeric operations
+### Preliminary Data Cleaning/Modifications
+
+Basic Preprocessing:
+First we removed the dollar sign and comma in price to enable numeric operations. Then we removed mi. and , to enable numeric operation for milage as well. We also corrected the spelling of mileage from milage to mileage. The Engine column contains very useful information such as the horsepower, displacement, cylinders, engine type, and fuel type all in one column so we made each one into its own separate column. 
 ```{r, echo=FALSE}
 data$price <- as.numeric(gsub("[$,]", "", data$price))
 ```
 
-Corrected the spelling of mileage from milage to mileage. Removed mi. and , to enable numeric operations. 
+
 ```{r, echo=FALSE}
 colnames(data)[colnames(data) == "milage"] <- "mileage"
 data$mileage <- as.numeric(gsub("[,]| mi\\.", "", data$mileage))
 ```
 
-The Engine columns contains very useful information such as the horsepower, displacement, cylinders, engine type, and fuel type. We turn these all into new columns. 
-```{r, echo=FALSE}
+
+```{r, include=FALSE}
 # Extract Horsepower (HP)
 data$horsepower <- as.numeric(str_extract(data$engine, "\\d+\\.\\d+(?=HP)"))
 
@@ -152,8 +155,8 @@ data$fuel_type <- str_extract(data$engine, "Gasoline|Diesel|Electric|Hybrid|Flex
 data$engine = NULL
 head(data)
 ```
-Looking at each column's type and unique count 
-```{r, echo=FALSE}
+
+```{r, include=FALSE}
 sapply(data, class)
 sapply(data, function(col) {
   if (is.character(col)) {
@@ -164,15 +167,15 @@ sapply(data, function(col) {
 })
 ```
 
-Let's examine columns that include NA or Empty String entries. 
-```{r, echo=FALSE}
+
+```{r, include=FALSE}
 na_columns <- colSums(is.na(data)) > 0
 empty_string_columns <- colSums(data == "") > 0
 columns_with_na_or_empty <- na_columns | empty_string_columns
 print(names(data)[columns_with_na_or_empty])
 ```
 
-#Analyzing categorical variables
+### Analyzing categorical variables
 Categorical variables with various unique values include brand, model, transmission, ext_col, int_col. Let's examine all of them
 
 First, we look at the "brand" and the "model" columns. Through analysis shown below, we have decided to omit both of these columns. Our reasoning and visualizations are shown below. 
@@ -182,12 +185,12 @@ There are 57 unique brands with the frequency histogram not showing much dominan
 length(unique(data$brand)) 
 # calculate the counts for brand
 brandcounts <- table(data$brand)
-barplot(brandcounts,
-  main = "Histogram of brand",
-  xlab = "brand",
-  ylab = "Count",
-  col = "skyblue",
-  las = 2) 
+#barplot(brandcounts,
+  #main = "Histogram of brand",
+  #xlab = "brand",
+  #ylab = "Count",
+  #col = "skyblue",
+  #las = 2) 
 
 result <- data %>%
   group_by(brand) %>%
@@ -202,8 +205,8 @@ print(result_sorted)
 #omit this column 
 data$brand = NULL
 ```
-This problem is seen even more in the model column. We also omit this column from the dataset 
-```{r, echo=FALSE}
+A similar problem is seen in the model column. We also omit this column from the dataset 
+```{r, include=FALSE}
 length(unique(data$model))
 modelcounts <- table(data$model)
 barplot(modelcounts,
@@ -218,7 +221,7 @@ data$model = NULL
 ```
 
 Now, let's examine colors. There are both intcol and extcol variables. Having too many unique color names can introduce noise into your classification model and make it harder for the model to generalize effectively. Grouping the colors into broader, more general categories can help improve model performance by reducing the dimensionality of the feature and making patterns more apparent.
-```{r, echo=FALSE}
+```{r, include=FALSE}
 # Define the mapping function
 generalize_colors <- function(color_name) {
   # Convert to lowercase for uniformity
@@ -243,7 +246,7 @@ generalize_colors <- function(color_name) {
 }
 ```
 
-```{r, echo=FALSE}
+```{r, include=FALSE}
 length(unique(data$ext_col))
 extcolorcounts <- table(data$ext_col)
 barplot(extcolorcounts,
@@ -253,23 +256,23 @@ barplot(extcolorcounts,
   col = "skyblue",
   las = 2) 
 ```
-Let's apply the generalization function to simply the different colors
+We narrowed down the colors to 6 generalized colors
 ```{r, echo=FALSE}
 data$ext_col <- sapply(data$ext_col, generalize_colors)
 unique(data$ext_col)
 ```
 
 
-The same thing happens to int_col, but looking at the dataset we will have 4 categories. 
+The same thing happens to int_col, but looking at the dataset we decided to have 4 categories. 
 ```{r, echo=FALSE}
-length(unique(data$int_col))
+#length(unique(data$int_col))
 intcolorcounts <- table(data$int_col)
-barplot(intcolorcounts,
-  main = "Histogram of interior color",
-  xlab = "model",
-  ylab = "Count",
-  col = "skyblue",
-  las = 2) 
+#barplot(intcolorcounts,
+  #main = "Histogram of interior color",
+  #xlab = "model",
+  #ylab = "Count",
+  #col = "skyblue",
+  #las = 2) 
 
 # Grouping less frequent categories
 data$int_col <- ifelse(
@@ -283,8 +286,8 @@ data$int_col <- ifelse(
 unique(data$int_col)
 ```
 
-Examining the transmission column now 
-```{r, echo=FALSE}
+
+```{r, include=FALSE}
 length(unique(data$transmission))
 # calculate the counts for transmission
 trancounts <- table(data$transmission)
@@ -311,14 +314,9 @@ significant_transmissions <- result_sorted$transmission[result_sorted$count > th
 print(significant_transmissions)
 ```
 
-Now, we have looked at all the categorical variables with many many unique values, we will now one-hot encode the cagtegorical vairables. 
-# One-hot encoding categorical variables 
 
-After looking at histograms for both Brand and Transmission, it seems Brand is more uniformly distributed while Transmission has a few salient categories. After exploring the categories of transmissions we found that the top 7 most frequent transmissions account for approximately 67-70% of the data points. Therefore we will one hot encode these 7 categories + an "Other" category for Transmission for a total of 8 transmission categories. We will also one hot encode "fuel type" and "cylinders" since those are categorical variables as well.
 
-## Transmission
-
-```{r, echo=FALSE}
+```{r, include=FALSE}
 # map transmissions to just the top 7 or Other. could make this function take in significant_transmissions too for extensibility
 map_transmission <- function(transmission) {
   primary_transmissions <- c(
@@ -342,9 +340,9 @@ map_transmission <- function(transmission) {
 data$transmission <- sapply(data$transmission, map_transmission)
 ```
 
-#Analyzing Null/Empty Values 
+### Analyzing Null/Empty Values 
 We will first look at the problem with NA and Empty values, something that this dataset has a lot of. We will first handle both NA and Empty "" values by replacing them to "NA" to make it easier to preprocess and analyze.  
-```{r, echo=FALSE}
+```{r, include=FALSE}
 na_columns <- colSums(is.na(data)) > 0
 empty_string_columns <- colSums(data == "") > 0
 columns_with_na_or_empty <- na_columns | empty_string_columns
@@ -366,11 +364,11 @@ sum(is.na(data$displacement))
 table(data$displacement)
 summary(data)
 ```
-There are five columns with empty strings/NA values. Let's examine all five of them to discover if we can find any patterns. 
+There are several features with empty strings/NA values. Let's examine all them to discover if we can find any patterns. 
 
-## horsepower 
+### horsepower 
 
-```{r, echo=FALSE}
+```{r, include=FALSE}
 # number of unique values in horsepower
 length(table(data$horsepower))
 
@@ -395,9 +393,9 @@ sum(is.na(data$horsepower))
 
 Since there are 348 unique values in horsepower, we can consider horsepower as a continuous variable rather than categorical. However, there are 810 null values in a dataset with 4009 entries which is over 20% null values. This is too many to simply drop, so we want to perform some form of imputation. Looking at the distribution of horsepowers, we can see that the median is a good representative approximation for the distribution so we will use **median imputation**.
 
-## displacement (engine size)
+### displacement (engine size)
 
-```{r, echo=FALSE}
+```{r, include=FALSE}
 # number of unique values in displacement
 # table(data$displacement)
 length(table(data$displacement))
@@ -423,7 +421,7 @@ sum(is.na(data$displacement))
 
 There are 61 unique values in displacement (engine size). Although these appear to be discretized measurements (ex: size = 0.8 or size = 3.71 may not make sense), we can treat it as a more continuous predictor for now. There are 396 null values in displacement which is just under 10% null values, so we could consider dropping these. However since the median already exists in the dataset (median = 3.5) we can also proceed with median imputation which is what we did. 
 
-```{r, echo=FALSE}
+```{r, include=FALSE}
 result <- data %>%
   group_by(fuel_type) %>%
   summarise(
@@ -437,8 +435,8 @@ data$fuel_type[is.na(data$fuel_type)] <- "NA"
 ```
 The NA values for fuel_type have a higher median price and average price than other types, and makes up a significant count of observations so we are going to treat it as a separate category.
 
-#cylinder 
-```{r, echo=FALSE}
+
+```{r, include=FALSE}
 result <- data %>%
   group_by(cylinders) %>%
   summarise(
@@ -450,8 +448,8 @@ print(result)
 data$cylinders[is.na(data$cylinders)] <- "NA"
 ```
 
-#accident 
-```{r, echo=FALSE}
+### accident 
+```{r, include=FALSE}
 result <- data %>%
   group_by(accident) %>%
   summarise(
@@ -469,7 +467,9 @@ data$accident <- ifelse(data$accident == "At least 1 accident or damage reported
 # unique(data$accident)
 ```
 
-```{r, echo=FALSE}
+### clean_title
+
+```{r, include=FALSE}
 result <- data %>%
   group_by(clean_title) %>%
   summarise(
@@ -481,13 +481,13 @@ print(result)
 ```
 
 The NA values for clean_title clearly have a significantly higher median price and will be treated as a separate category. We apply similar reasoning from accident to clean_title. Since there is only "Yes" and NA, we treat all the yes's to 1 and all the NA values to 0.
-```{r, echo=FALSE}
+```{r, include=FALSE}
 data$clean_title <-ifelse(data$clean_title == "Yes", 1, 0)
 unique(data$clean_title)
 ```
 
-#engine type 
-```{r, echo=FALSE}
+
+```{r, include=FALSE}
 # calculate the counts for horsepower
 engine_counts <- table(data$engine_type)
 
@@ -510,7 +510,12 @@ print(result)
 data$engine_type[is.na(data$engine_type)] <- "NA"
 ```
 
-#Removing Outliers 
+### fuel type/engine type/cylinder
+We decided to make NA it's own category for these categorical variables by factoring the features. This is because after analyzing the relationship between price and every level of each categorical variable we found that NA had its own median price that is distinct from the other levels, so we couldn't set the NA values to a default level.
+
+
+
+### Removing Outliers 
 We remove outliers with 1.5*IQR value.
 ```{r, echo=FALSE}
 Q1 <- quantile(data$price, 0.25, na.rm = TRUE)
@@ -528,24 +533,22 @@ print(paste("Number of outliers: ", nrow(outliers), "and average price of these 
 data <- data[!(data$price < lower_bound | data$price > upper_bound), ]
 ```
 
-```{r, echo=FALSE}
-summary(data)
-```
-#turning each categorial column into a factor type 
-```{r, echo=FALSE}
+
+```{r, include=FALSE}
 data[sapply(data, is.character)] <- lapply(data[sapply(data, is.character)], as.factor)
 ```
 
 
-#one hot encoding
-Some models will require one hot encoding. For these models, we create a new dataset and apply this one hot encoding 
-```{r, echo=FALSE}
+### one hot encoding
+We will now one-hot encode the categorical variables: 
+After looking at histograms for both Brand and Transmission, it seems Brand is more uniformly distributed while Transmission has a few salient categories. After exploring the categories of transmissions we found that the top 7 most frequent transmissions account for approximately 67-70% of the data points. Therefore we will one hot encode these 7 categories + an "Other" category for Transmission for a total of 8 transmission categories. We will also one hot encode "fuel type" and "cylinders" since those are categorical variables as well.
+```{r, include=FALSE}
 dummy_model <- dummyVars(~ ., data = data)
 data_one_hot <- as.data.frame(predict(dummy_model, newdata = data))
 ```
 
 
-#Final Summary Statistics
+### Final Summary Statistics
 ```{r, echo=FALSE}
 dim(data_one_hot)
 summary(data_one_hot)
@@ -905,3 +908,10 @@ pred_toyota_new <- predict(lassomodel, newx = as.matrix(toyota_new))
 print(paste("the new price is ", pred_toyota_new))
 
 ```
+
+
+## Appendix
+
+# A more detailed look at the dataset
+
+
