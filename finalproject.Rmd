@@ -738,7 +738,7 @@ elasticnet_rmse = sqrt(mean((elasticpred - ytest)^2)) #outpus 11993.98
 best_lambda <- lassomodel$lambda.min
 lasso_coefficients <- coef(lassomodel, s = best_lambda)
 ```
-Out of the three models, the Lasso model performs the best, with a RMSE of 11992.87. Lasso is different from Ridge in that it can shrink coefficients to exactly 0, making it useful for cases when the data has useless features. Examining the coefficients of Lasso, it seems that the most predictive variables include model_year, fuel_type.Diesel, displacement, and engine_type.TwinTurbo. This seems to suggest that variables related to a car's power and performance are key in determining a price of a used car. 
+Out of the three models, the Lasso model performs the best, with a RMSE of 11992.87. Lasso is different from Ridge in that it can shrink coefficients to exactly 0, making it useful for cases when the data has useless features. Examining the coefficients of Lasso, it seems that the most predictive variables include model_year, fuel_type.Diesel, displacement, engine_type.TwinTurbo, and mileage. This seems to suggest that variables related to a car's power and performance are key in determining a price of a used car. 
 
 
 ### 2. K Nearest Neighbors(KNN) 
@@ -811,8 +811,13 @@ svm_predictions <- predict(svm_model, newdata = as.matrix(xtest))
 svm_rmse <- sqrt(mean((svm_predictions - ytest)^2)) #outputs 11054.76
 ```
 
-### 4. Random Forest 
-Random Forest is another powerful supervised machine learning algorithm that involves building numerous decision trees using different subsets of the data, acquired through a technique called bootstrapping.  
+### 5. Random Forest 
+Random Forest is another powerful supervised machine learning algorithm that involves building numerous decision trees using different subsets of the data, acquired through a technique called bootstrapping. Again, we use RMSE to evaluate the performance since that metric is directly comparable with other models. Parameter tuning was done with standard grid search over the 3 parameters of ntree, mtry, and nodesize. 
+
+- ntree represents the number of decision trees in our model 
+- mtry represents the number of features randomly selected at each node split
+- nodesize represents the minimum number of observations in a leaf node. 
+Each parameter influences the model's bias-variance tradeoff, so careful experimentation is required to find their optimal values. 
 ```{r echo = FALSE}
 set.seed(1)
 # redefine with factored versions directly, don't need one hot
@@ -828,7 +833,7 @@ y_test <- y_factor[-train_index]
 
 ```{r eval = FALSE}
 tune_results <- expand.grid(
-  ntree = c(500),
+  ntree = c(100, 200, 300, 400, 500),
   mtry = c(5, ncol(X_train)),
   nodesize = c(1, 5, 30),
   sampsize = nrow(X_train) # maximum
@@ -867,17 +872,13 @@ for (i in 1:nrow(tune_results)) {
 }
 randomforest_rmse = sqrt(lowest_mse) #evalulates to 9497.301
 ```
+Our final Random Forest model has ntree = 500, mtry = 5, and nodesize = 1. This model achieves an RMSE of 9497.301, the lowest among all models we've tested, aligning perfectly with the findings of one of the literature studies we looked at. 
 
+A Random Forest model also provides an advantage with its interpretability. It's able to provide the importance of variables, as seen in the plot below. From the plot, we can see the most influential variables in descending order are as follows: mileage, horsepower, model_year, and displacement. These results also some overlap in the importance of variables between our linear model and regression trees.
 ```{r}
 varImpPlot(best_model)
 ```
-We use MSE to evaluate random forest since that metric is directly comparable with other models. 
-Base random forest gets MSE (not OOB error) is 9855.106 with ntree = 500 and all other parameters being default. 
-Tuned random forest gets MSE of 9497.301 with ntree = 500, mtry = 5, nodesize = 1, and sampsize = nrow(X_train).
-Tuning was done with standard grid search over the 3 parameters of ntree, mtry, and nodesize. 
-Descending order of variable importance is mileage, horsepower, model year, and displacement. 
-
-### 5. Gradient Boosting Regressor 
+ 
 
 ## Open-Ended Question/Conclusion
 A researcher is interested in estimating the original price of the cars in our dataset as if they were brand new. To solve this problem, we built a machine learning model using features that we believed are most relevant to understanding depreciation. We utilized the following key features to model depreciation: 
