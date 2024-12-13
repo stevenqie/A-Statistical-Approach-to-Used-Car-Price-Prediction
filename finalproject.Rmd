@@ -103,6 +103,9 @@ library(glmnet)
 library(stats)
 library(dplyr)
 library(class)
+library(e1071)
+library(caret)
+
 # Load necessary libraries
 
 data <- read.csv("used_cars.csv")
@@ -697,62 +700,52 @@ Similar to Cluster 1, with a more recent avg_model_year, also has a lower avg_mi
 
 ## Prediction Models 
 
-For all the supervised models below, we will split the data into training sets for model training and testing sets to evaluate performance and accuracy
+For our supervised models, we will divide the data into training and testing sets using an 80/20 split. The training set (80% of the data) will be used to train the models, while the testing set (20% of the data) will be reserved to evaluate their performance and accuracy.
 ```{r, echo=FALSE}
-y = data_one_hot$price
+y <- data_one_hot$price
 X <- data_one_hot[, !(colnames(data_one_hot) %in% "price")]
-
 sample <- sample(c(TRUE, FALSE), nrow(data), replace=TRUE, prob=c(0.8, 0.2))
 xtrain <- X[sample, ]
 xtest <- X[!sample, ]
 ytrain = y[sample]
 ytest = y[!sample] 
-
 ```
 
-1. Linear Model. There are mainly three possible linear models: Lasso, Ridge, and Elastic Net. We will try all three models and see which one performs the best. Lasso, Ridge, and Elastic Net all benefit from feature scaling because these models involve regularization. which will penalize the size of coefficients of the model to avoid overfitting. All 3 models also involving a tuning parameter, and so we will use k-fold cross validation to find the best parameters. cv.glmnet will automatically scale and center the data as well. 
+### 1. Linear Model(Lasso, Ridge, Elastic Net)
 
-Training our ridge model 
-```{r, echo=FALSE}
+Lasso, Ridge, and Elastic net are techniques used in linear regression to improve generalization and prevent overfitting. These regularization techniques work by penalizing the size of coefficients of the model and work well when dealing with high-dimensional data. All 3 models also involve tuning parameters, which control the strength of the penalty, so k-fold cross validation will be used to find the optimal parameters. The cv.glmnet function trains these models and also automatically scales and centers the data. 
+```{r}
+#Training the models
 ridgemodel = cv.glmnet(x = as.matrix(xtrain), y = ytrain, nfolds = 10, alpha = 0)
-```
-
-```{r, echo=FALSE}
-ridgemodel$lambda.min
-
-pred = predict(ridgemodel, newx = as.matrix(xtest), s = "lambda.min")
-sqrt(mean((pred - ytest)^2))
-```
-
-Training our lasso model 
-```{r, echo=FALSE}
 lassomodel = cv.glmnet(x = as.matrix(xtrain), y = ytrain, nfolds = 10, alpha = 1)
-```
-
-```{r, echo=FALSE}
-lassomodel$lambda.min
-
-pred = predict(lassomodel, newx = as.matrix(xtest), s = "lambda.min")
-sqrt(mean((pred - ytest)^2))
-```
-
-Training our elastic net model 
-```{r, echo=FALSE}
 elastic_net_model <- cv.glmnet(x = as.matrix(xtrain), y = ytrain, nfolds = 10, alpha = 0.5)
 ```
 
-```{r, echo=FALSE}
-elastic_net_model$lambda.min
+To assess and compare performance of these 3 models, we utilize RMSE, or Root Mean Squared Error. RMSE measures the average difference between the values predicted by a model and the actual values. A lower RMSE indicates better model performance, as it means there are smaller differences between the predicted and actual values. 
+```{r, results = "hide"}
+ridgepred = predict(ridgemodel, newx = as.matrix(xtest), s = "lambda.min")
+lassopred = predict(lassomodel, newx = as.matrix(xtest), s = "lambda.min")
+elasticpred = predict(elastic_net_model, newx = as.matrix(xtest), s = "lambda.min")
 
-pred1 = predict(elastic_net_model, newx = as.matrix(xtest), s = "lambda.min")
-sqrt(mean((pred1 - ytest)^2))
+#RMSE Calculations
+ridge_rmse = sqrt(mean((ridgepred - ytest)^2)) #outputs 12017.06
+
+lasso_rmse = sqrt(mean((lassopred - ytest)^2)) #outputs 11992.87
+
+elasticnet_rmse = sqrt(mean((elasticpred - ytest)^2)) #outpus 11993.98
 ```
 
-Out of our 3 linear models, Ridge performed the best, with a RMSE of 12261.19 
+```{r, echo = FALSE }
+best_lambda <- lassomodel$lambda.min
+lasso_coefficients <- coef(lassomodel, s = best_lambda)
+```
+Out of the three models, the Lasso model performs the best, with a RMSE of 11992.87. Lasso is different from Ridge in that it can shrink coefficients to exactly 0, making it useful for cases when the data has useless features. Examining the coefficients of Lasso, it seems that the most predictive variables include model_year, fuel_type.Diesel, displacement, and engine_type.TwinTurbo. This seems to suggest that variables related to a car's power and performance are key in determining a price of a used car. 
 
 
-2. K Nearest Neighbors(KNN) regression works by calculating the k nearest training set data points to the test point and predicting the target value by taking the average of their target values. KNN is sensitive to feature scaling, so we will need to scale the data. The reason behind this is for example, if one feature has ranges from 1-10 and another one has 1-10000, distance calcualtions will be biased and results will suffer as a result. KNN is also sensitive to the choice of k. To find the optimal value of k, we will perform k-fold cross validation. 
-```{r, echo=FALSE}
+### 2. K Nearest Neighbors(KNN) 
+
+KNN regression works by calculating the k nearest training set data points to the test point and predicting the target value by taking the average of their target values. Because KNN is a distance based algorithm, it is sensitive to feature scaling. For example, if one feature has ranges from 1-10 and another one has 1-10000, distance calculations will be biased and results will suffer as a result. In addition to standardizing and normalizing our data, we will also perform Principal Component Analysis(PCA) to further reduce the dimensionality of our data and reduce noise, while retaining most of the overall variance. We will keep components that make up 90% of the explained variance. Finally, KNN is also sensitive to the choice of k. To find the optimal value of k, we will again perform k-fold cross validation. We will again, use RMSE to evaluate the performance of our model. 
+```{r, include=FALSE}
 set.seed(1)
 
 # 2. Scale the numeric columns
@@ -764,90 +757,107 @@ xtest_processed <- predict(preProcValues, xtest)
 
 pca_model <- prcomp(xtrain_processed, center = TRUE, scale. = TRUE)
 explained_variance <- summary(pca_model)$importance[3, ]  # Cumulative variance
-num_components <- which(explained_variance >= 0.95)[1]   # First component to reach 95%
-
-# Print the number of components
-cat("Number of components to retain:", num_components, "\n")
+num_components <- which(explained_variance >= 0.85)[1]   # First component to reach 90%
 
 # Transform the training and testing data
 xtrain_pca <- pca_model$x[, 1:num_components]  # Retain the first num_components
 xtest_pca <- as.matrix(xtest_processed) %*% pca_model$rotation[, 1:num_components]
+```
 
+```{r, echo = FALSE}
 # 3. Train the KNN model using the processed data
 control <- trainControl(method = "cv", number = 10)
 knn.cvfit <- train(ytrain ~ ., method = "knn", 
                    data = data.frame(xtrain_pca, ytrain),
-                   tuneGrid = data.frame(k = seq(1, 45, 1)),
+                   tuneGrid = data.frame(k = seq(1, 20, 1)),
                    trControl = control)
 
 # 4. Plot the cross-validation results
 plot(knn.cvfit)
-
-# 6. Print the best value of k based on cross-validation
-print(paste("The best value of k based on cross-validation is: ", knn.cvfit$bestTune$k))
 ```
+This graph not only illustrates the cross-validation results for KNN, but also highlights a fundamental concept in machine learning: The Bias-Varaince Trade Off. At low values of K, the RMSE is high due to overfitting, which corresponds to high variance and low bias. The model performs well on the training data, as it relies on very few neighbors, but becomes sensitive when exposed to new testing data. In contrast, high k values correspond to low variance and high bias. The model is more generalized, but it may start to underfit, reflected in the slow increase of RMSE as the k becomes larger and larger. The optimal K achieved through cross validation, K = 5, balances bias and variance to achieve the lowest RMSE. 
 
-```{r, echo=FALSE}
-# Train the final model using the best value of k and find the predictions
-best_k <- knn.cvfit$bestTune$k
-knn_predictions <- knn(train = xtrain_processed, test = xtest_processed, cl = ytrain, k = best_k)
-
-# Calculate prediction error 
-print(paste("Prediction errort: ", sqrt(mean((as.numeric(knn_predictions) - ytest)^2))))
-```
-
-3. Random Forest 
-
+Finally, we train a knn model using this optimal k and calculate the RMSE, which is found to be 39728.95
 ```{r}
+best_k <- knn.cvfit$bestTune$k #outputs 5
+knn_predictions <- knn(xtrain_processed, xtest_processed, ytrain, best_k)
+
+#RMSE Calculation
+knn_rmse = sqrt(mean((as.numeric(knn_predictions) - ytest)^2)) #outputs 39728.95
+```
+
+### 3. SVM
+Support Vector Machines(SVM) are another supervised machine learning model that excels in high-dimensional spaces, as well as in memory due to the use of support vectors. Their ability to utilize various different kernel functions, both linear and non-linear, allow them to handle complex decision boundaries and capture nonlinear relationships in the data effectively. The radial kernel is a popular kernel choice, and involves 2 key tuning parameters: C and Sigma. Multiple SVM models were fit using different values of C and Sigma, and K-Fold Cross Validation was used to find the combination with the lowest RMSE. 
+```{r}
+train_control <- trainControl(method = "cv", number = 5)  
+tune_grid <- expand.grid(
+  C = c(0.1, 1, 5, 7, 10),         #different values of C
+  sigma = c(0.01, 0.1, 0.5, 0.7, 1)    # different values of sigma 
+)
+```
+
+The Best Parameters for C and Sigma were found to be C=7 and Sigma=0.01. The RMSE for this combination was found to be 11054.76
+```{r}
+svm_model <- train(
+  x = as.matrix(xtrain),
+  y = as.vector(ytrain),
+  method = "svmRadial",       # using the radial kernel
+  trControl = train_control,  
+  tuneGrid = tune_grid      
+)
+optimal_parameters <- svm_model$bestTune #outputs C = 7 and sigma = 0.01
+svm_predictions <- predict(svm_model, newdata = as.matrix(xtest))
+
+#RMSE Calculation
+svm_rmse <- sqrt(mean((svm_predictions - ytest)^2)) #outputs 11054.76
+```
+
+### 4. Random Forest 
+Random Forest is another powerful supervised machine learning algorithm that involves building numerous decision trees using different subsets of the data, acquired through a technique called bootstrapping.  
+```{r echo = FALSE}
 set.seed(1)
 # redefine with factored versions directly, don't need one hot
 y_factor = data$price
-X_factor <- data[, !(colnames(data) %in% "price")]
-
+X_factor <- data[, !(colnames(data) %in% "price") & !(colnames(data) %in% "cluster")]
 # using xtrain, ytrain
 train_index <- createDataPartition(y_factor, p = 0.8, list = FALSE)
 X_train <- X_factor[train_index, ]
 y_train <- y_factor[train_index]
 X_test <- X_factor[-train_index, ]
 y_test <- y_factor[-train_index]
+```
 
-# base rf
-
-# rftest = randomForest(
-#     X_train, y_train,
-#     ntree = 500
-#   )
-# 
-# y_pred <- predict(rftest, X_test)
-# mse <- sqrt(mean((y_pred - y_test)^2))
-# mse
-# ncol(X_train)
-
+```{r eval = FALSE}
 tune_results <- expand.grid(
   ntree = c(500),
-  # ntree = c(1, 50, 500),
   mtry = c(5, ncol(X_train)),
-  # mtry = c(1, 5, 10),
-  # nodesize = c(5, 10, 20, 30),
   nodesize = c(1, 5, 30),
   sampsize = nrow(X_train) # maximum
 )
+```
 
+```{r echo = FALSE }
+tune_results <- expand.grid(
+  ntree = c(500),
+  mtry = c(5),
+  nodesize = c(1),
+  sampsize = nrow(X_train) # maximum
+)
+```
+
+```{r}
 # tune_results
-
 best_model <- NULL
-best_params <- NULL
-lowest_mse <- Inf
-
+best_params <- NULL #ends up evaluating to 500, 5, 1
+lowest_mse <- Inf 
 for (i in 1:nrow(tune_results)) {
   params <- tune_results[i, ]
-  model <- randomForest(
-    X_train, y_train,
-    ntree = params$ntree,
-    mtry = params$mtry,
-    nodesize = params$nodesize,
-    sampsize = params$sampsize
-  )
+  model <- randomForest(X_train, 
+                        y_train, 
+                        ntree = params$ntree,
+                        mtry = params$mtry,
+                        nodesize = params$nodesize,
+                        sampsize = params$sampsize)
   y_pred <- predict(model, X_test)
   mse <- mean((y_pred - y_test)^2)
   if (mse < lowest_mse) {
@@ -856,30 +866,19 @@ for (i in 1:nrow(tune_results)) {
     best_params <- c(params$ntree, params$mtry, params$nodesize)
   }
 }
-
-lowest_mse = sqrt(lowest_mse)
-print(best_model) 
-print(lowest_mse) 
-print(best_params)
-
-# importance(best_model)
-varImpPlot(best_model)
-# variable importance 
-# mileage, horsepower, model_year, displacement
+randomforest_rmse = sqrt(lowest_mse) #evalulates to 9497.301
 ```
 
+```{r}
+varImpPlot(best_model)
+```
 We use MSE to evaluate random forest since that metric is directly comparable with other models. 
-
 Base random forest gets MSE (not OOB error) is 9855.106 with ntree = 500 and all other parameters being default. 
-
 Tuned random forest gets MSE of 9497.301 with ntree = 500, mtry = 5, nodesize = 1, and sampsize = nrow(X_train).
-
 Tuning was done with standard grid search over the 3 parameters of ntree, mtry, and nodesize. 
-
 Descending order of variable importance is mileage, horsepower, model year, and displacement. 
 
-4. SVM? does this count as a linear model 
-5. Gradient Boosting Regressor 
+### 5. Gradient Boosting Regressor 
 
 ## Open-Ended Question/Conclusion
 A researcher is interested in estimating the original price of the cars in our dataset as if they were brand new. To solve this problem, we built a machine learning model using features that we believed are most relevant to understanding depreciation. We utilized the following key features to model depreciation: 
