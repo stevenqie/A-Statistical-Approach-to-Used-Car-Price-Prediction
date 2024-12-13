@@ -527,7 +527,6 @@ data_one_hot <- as.data.frame(predict(dummy_model, newdata = data))
 
 ### Final Summary Statistics
 ```{r, echo=FALSE}
-dim(data_one_hot)
 summary(data_one_hot)
 ```
 
@@ -581,14 +580,14 @@ There seems to be a pretty solid relationship between a more recent model_year a
 
 2. Hierarchical Clustering 
 
-Next, we will try hierarchical clustering with three different linkage methods(single, complete, and average) using euclidean distance. Hierarchical Clustering begins with each data point starting as its own cluster. The goal is to progressively group them together until there is only one group. The process involves choosing the closest two groups, calculated through a specific distance metric. 
+Next, we will try hierarchical clustering with three different linkage methods(single, complete, and average) using euclidean distance. Hierarchical Clustering begins with each data point starting as its own cluster. The goal is to progressively group them together until there is only one group. The process involves choosing the closest two groups, calculated through a specific distance metric. The features we will cluster is 
 ```{r, echo=FALSE}
 #numeric_data <- data[, c("model_year", "price")]
 numeric_data <- data[, sapply(data, is.numeric)]
 numeric_data_without_price <- numeric_data[, !colnames(numeric_data) %in% "price"]
-
+colnames(numeric_data)
 ```
-Removing non-numeric features as clustering requires numeric features. Also, removed the target feature price.
+These are all numeric features as clustering requires numeric features
 
 ```{r, echo=FALSE}
 
@@ -606,7 +605,7 @@ par(mfrow = c(1, 1))  # Reset plotting layout
 
 
 ```
-
+We will use complete linkage as it looks like it generates pretty distinct clusters
 
 
 ```{r, echo=FALSE}
@@ -645,7 +644,7 @@ There are a lot of correlations here that make sense between the 2 clusters. Clu
 
 3. Spectral Clustering 
 
-Finally, we will try spectral clustering, which aims to group observations based on their proximity information. This method involves 2 main steps, the first being using the eigenvalues of a similarity matrix to perform dimension reduction, followed by applying a clustering algorithm like K-means. 
+Finally, we will try spectral clustering, which aims to group observations based on their proximity information. This method involves 2 main steps, the first being using the eigenvalues of a similarity matrix to perform dimension reduction, followed by applying a clustering algorithm like K-means. The same features as hierarchical clustering will be used
 
 ```{r, echo=FALSE}
 
@@ -684,9 +683,9 @@ cluster_summary <- data %>%
 print(cluster_summary)
 
 
-ggplot(data %>% filter(!is.na(cluster)), aes(x = model_year, y = mileage, color = cluster)) +
+ggplot(data %>% filter(!is.na(cluster)), aes(x = model_year, y = price, color = cluster)) +
   geom_point(size = 2) +
-  labs(title = "Spectral Clustering Results", x = "Model Year", y = "Mileage") +
+  labs(title = "Spectral Clustering Results", x = "Model Year", y = "Price") +
   theme_minimal()
 
 
@@ -695,7 +694,7 @@ ggplot(data %>% filter(!is.na(cluster)), aes(x = model_year, y = mileage, color 
 ```
 We ran Spectral Clustering on a randomly selected 1000 row subset for the data as the computation time was taking too long for the full dataset.
 
-Similar to Cluster 1, with a more recent avg_model_year, also has a lower avg_mileage and a lower avg_accident rate, this cluster also has a much higher avg_price in comparison to cluster 2. The distribution of data points between the 2 clusters seem to be more even in comparison to hierarchically clustering, meaning that perhaps spectral clustering is more suitable for this dataset.
+Similar to hierarchical clustering, cluster 1, with a more recent avg_model_year, also has a lower avg_mileage and a lower avg_accident rate, this cluster also has a much higher avg_price in comparison to cluster 2. The distribution of data points between the 2 clusters seem to be more even in comparison to hierarchically clustering, meaning that perhaps spectral clustering is more suitable for this dataset. Looking at the graph. as we clustered using multiple different feature, there is no clear relationship between model year and price anymore like there was in the kmeans clustering.
 
 
 ## Prediction Models 
