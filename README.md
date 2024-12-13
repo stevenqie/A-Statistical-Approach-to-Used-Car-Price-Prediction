@@ -1,2 +1,1 @@
-# stat432_final_project
-a
+# our stat432_final_project
