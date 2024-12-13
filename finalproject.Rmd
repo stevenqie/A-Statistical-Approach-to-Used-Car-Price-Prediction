@@ -1,7 +1,8 @@
 ---
 title: "A Statistical Approach to Used Car Price Prediction"
-output: 
+output:
   pdf_document: default
+  word_document: default
 date: "12/09/2024"
 header-includes:
 - \usepackage{multicol}
@@ -59,19 +60,8 @@ Need a section on key findings....
 
 Abstract— 
 
-white space 
 
-white space 
-
-white space 
-
-white space 
-
-white space 
-
-white space 
-
-white space 
+For unsupervised learning, we simply utilized 3 clustering methods we learned from this course, namely kmeans clustering. hierarchical clustering, and spectral clustering, in order to find any hidden patterns in the dataset. Some parts of the methods that we used, such as the Silhouette Method was inspired by the research papers in the literature review, as we saw it being used there.
 
 white space 
 
@@ -539,9 +529,7 @@ summary(data_one_hot)
 ```
 
 ## Unsupervised Learning 
-Apply at least three clustering algorithms to the processed dataset.
-Determine the appropriate number of clusters and discuss the interpretability of these clusters. Do they hold any meaningful distinctions?
-Examine whether the clustering results are associated with your outcome variable.
+
 
 1. KMeans Clustering 
 ```{r, echo=FALSE}
@@ -673,36 +661,38 @@ set.seed(1)  # For reproducibility
 n_clusters <- 2  # Number of clusters
 specc_result <- specc(as.matrix(subset_data), centers = n_clusters, kernel = "rbfdot")
 
-# Step 4: Add cluster assignments to the original dataset
+
 data$cluster <- NA  # Initialize cluster column
 data$cluster[1:1000] <- as.factor(specc_result@.Data)  # Assign clusters to the first 1000 points
 
-# Step 5: Summarize the clusters
+# Step 5: Summarize the cluster
 cluster_summary <- data %>%
   filter(!is.na(cluster)) %>%
   group_by(cluster) %>%
   summarise(
     avg_model_year = mean(model_year, na.rm = TRUE),
     avg_mileage = mean(mileage, na.rm = TRUE),
-    avg_accident = mean(as.numeric(accident), na.rm = TRUE),  # Convert 'accident' to numeric if necessary
+    avg_accident = mean(as.numeric(accident), na.rm = TRUE),  
     avg_horsepower = mean(horsepower, na.rm = TRUE),
     count = n()
   )
 
-# Print the cluster summary
+
 print(cluster_summary)
 
-# Step 6: Visualize the clusters (optional)
+
 ggplot(data %>% filter(!is.na(cluster)), aes(x = model_year, y = mileage, color = cluster)) +
   geom_point(size = 2) +
-  labs(title = "Spectral Clustering Results (First 1000 Points)", x = "Model Year", y = "Mileage") +
+  labs(title = "Spectral Clustering Results", x = "Model Year", y = "Mileage") +
   theme_minimal()
 
 
 
 
 ```
-Similar to Cluster 1, with a more recent avg_model_year, also has a lower avg_mileage and a lower avg_accident rate, this cluster also has a much higher avg_price in comparison to cluster 2. The distribution of data points between the 2 clusters seem to be more even in comparison to heirarchicaly clustering, meaning that perhaps spectral clustering is more suitable for this dataset.
+We ran Spectral Clustering on a randomly selected 1000 row subset for the data as the computation time was taking too long for the full dataset.
+
+Similar to Cluster 1, with a more recent avg_model_year, also has a lower avg_mileage and a lower avg_accident rate, this cluster also has a much higher avg_price in comparison to cluster 2. The distribution of data points between the 2 clusters seem to be more even in comparison to hierarchically clustering, meaning that perhaps spectral clustering is more suitable for this dataset.
 
 
 ## Prediction Models 
