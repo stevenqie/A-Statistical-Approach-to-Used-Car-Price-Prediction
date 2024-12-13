@@ -347,22 +347,6 @@ na_columns <- colSums(is.na(data)) > 0
 empty_string_columns <- colSums(data == "") > 0
 columns_with_na_or_empty <- na_columns | empty_string_columns
 print(names(data)[columns_with_na_or_empty])
-
-# data[data == "" | is.na(data)] <- "NA"
-# summary(data)
-# unique(data$horsepower)
-# unique(data$displacement)
-# unique(data$cylinders_numeric)
-unique(data$fuel_type_factor)
-unique(data$fuel_type_numeric)
-unique(data$horsepower)
-unique(data$displacement)
-unique(data$cylinders_factor)
-unique(data$cylinders_numeric)
-sum(is.na(data$horsepower))
-sum(is.na(data$displacement))
-table(data$displacement)
-summary(data)
 ```
 There are several features with empty strings/NA values. Let's examine all them to discover if we can find any patterns. 
 
@@ -822,8 +806,88 @@ knn_predictions <- knn(train = xtrain_processed, test = xtest_processed, cl = yt
 print(paste("Prediction errort: ", sqrt(mean((as.numeric(knn_predictions) - ytest)^2))))
 ```
 
-
 3. Random Forest 
+
+```{r}
+set.seed(1)
+# redefine with factored versions directly, don't need one hot
+y_factor = data$price
+X_factor <- data[, !(colnames(data) %in% "price")]
+
+# using xtrain, ytrain
+train_index <- createDataPartition(y_factor, p = 0.8, list = FALSE)
+X_train <- X_factor[train_index, ]
+y_train <- y_factor[train_index]
+X_test <- X_factor[-train_index, ]
+y_test <- y_factor[-train_index]
+
+# base rf
+
+# rftest = randomForest(
+#     X_train, y_train,
+#     ntree = 500
+#   )
+# 
+# y_pred <- predict(rftest, X_test)
+# mse <- sqrt(mean((y_pred - y_test)^2))
+# mse
+# ncol(X_train)
+
+tune_results <- expand.grid(
+  ntree = c(500),
+  # ntree = c(1, 50, 500),
+  mtry = c(5, ncol(X_train)),
+  # mtry = c(1, 5, 10),
+  # nodesize = c(5, 10, 20, 30),
+  nodesize = c(1, 5, 30),
+  sampsize = nrow(X_train) # maximum
+)
+
+# tune_results
+
+best_model <- NULL
+best_params <- NULL
+lowest_mse <- Inf
+
+for (i in 1:nrow(tune_results)) {
+  params <- tune_results[i, ]
+  model <- randomForest(
+    X_train, y_train,
+    ntree = params$ntree,
+    mtry = params$mtry,
+    nodesize = params$nodesize,
+    sampsize = params$sampsize
+  )
+  y_pred <- predict(model, X_test)
+  mse <- mean((y_pred - y_test)^2)
+  if (mse < lowest_mse) {
+    lowest_mse <- mse
+    best_model <- model
+    best_params <- c(params$ntree, params$mtry, params$nodesize)
+  }
+}
+
+lowest_mse = sqrt(lowest_mse)
+print(best_model) 
+print(lowest_mse) 
+print(best_params)
+
+# importance(best_model)
+varImpPlot(best_model)
+# variable importance 
+# mileage, horsepower, model_year, displacement
+```
+
+We use MSE to evaluate random forest since that metric is directly comparable with other models. 
+
+Base random forest gets MSE (not OOB error) is 9855.106 with ntree = 500 and all other parameters being default. 
+
+Tuned random forest gets MSE of 9497.301 with ntree = 500, mtry = 5, nodesize = 1, and sampsize = nrow(X_train).
+
+Tuning was done with standard grid search over the 3 parameters of ntree, mtry, and nodesize. 
+
+Descending order of variable importance is mileage, horsepower, model year, and displacement. 
+
 4. SVM? does this count as a linear model 
 5. Gradient Boosting Regressor 
 
