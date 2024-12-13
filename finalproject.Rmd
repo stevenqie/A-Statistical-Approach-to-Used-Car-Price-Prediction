@@ -15,6 +15,7 @@ header-includes:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(fig.width=7, fig.height=3)
+
 ```
 
 \begin{multicols}{3}
@@ -53,21 +54,15 @@ With the used car market being significantly larger than the new car market, man
 
 This report aims to develop various predictive models for used car prices using the Used Car Price Prediction Dataset from Kaggle. This dataset comprises of 4,009 data points, representing unique vehicle listings, as well as nine distinct features that serve as key indicators influencing the value of a used car. We follow a very structured and standard approach, including data exploration, preprocessing, model training, and evaluation using relevant performance metrics. By leveraging these methods, we aim to uncover valuable insights into the world of automobiles and the various factors that are driving used car prices.
 
-Need a section on key findings....
+Below is a high level overview of our methodology looking at unsupervised models and supervised prediction models as well as key findings for each.
 
+For unsupervised learning, we simply utilized 3 clustering methods we learned from this course, namely kmeans clustering. hierarchical clustering, and spectral clustering, in order to find any hidden patterns in the dataset. Some parts of the methods that we used, such as the Silhouette Method was inspired by the research papers in the literature review, as we saw it being used there. We found there to be a pretty strong positive relationship between model year and price, as well as some negative correlation between model year and other features like accident, mileage.
 
-
-Abstract— 
-
-
-For unsupervised learning, we simply utilized 3 clustering methods we learned from this course, namely kmeans clustering. hierarchical clustering, and spectral clustering, in order to find any hidden patterns in the dataset. Some parts of the methods that we used, such as the Silhouette Method was inspired by the research papers in the literature review, as we saw it being used there.
-
-white space 
-
-white space 
+For supervised learning we used 5 different prediction models that we learned from this course: LASSO regression, KNN, regression tree, random forest, and SVM for regression. One of our key findings was determining which variables were most important, which across multiple models seemed to be mileage, model_year, displacement (engine size), and horsepower. Random Forest seemed to do the best at predicting price as it had the lowest RMSE.
 
 We utilized AI tools in this report to enhance and assist in our writing. These tools helped play a big role in ensuring clarity, conciseness, and professionalism. We also utilized AI tools to help us with syntax help when writing code in R, as well as discovering potential bugs in our code. 
 
+\vspace{1cm}
 
 ## Literature Review 
 This literature review aims to summarize key findings and approaches from a few noteworthy research papers focused on used car price prediction. 
@@ -104,9 +99,6 @@ library(dplyr)
 library(class)
 library(e1071)
 library(caret)
-library(rpart)
-library(rpart.plot)
-library(skimr)
 
 # Load necessary libraries
 
@@ -528,14 +520,17 @@ data_one_hot <- as.data.frame(predict(dummy_model, newdata = data))
 
 
 ### Final Summary Statistics
+
+Here are the key numerical variables in our final dataset. The full dataset includes one-hot-encoded versions of the categorical variables and that can be found in the Appendix. Our regression tree and random forest models use just the factored versions of the categorical variables instead of the one-hot-encoded versions, but this just means using the dataset without the one-hot-encoded columns. This is because these models are better able to handle factor data types.
+
 ```{r, echo=FALSE}
-skim(data_one_hot)
+summary(data_one_hot[, c("model_year", "mileage", "price", "horsepower", "displacement")])
 ```
 
 ## Unsupervised Learning 
 
 
-1. KMeans Clustering 
+### 1. KMeans Clustering 
 ```{r, echo=FALSE}
 data_subset <- data[, c("model_year", "price")]
 data_subset <- na.omit(data_subset)
@@ -578,16 +573,18 @@ ggplot(data_subset, aes(x = model_year, y = price, color = cluster)) +
 ```
 There seems to be a pretty solid relationship between a more recent model_year and higher price. Although the 2 clusters seem to be mostly dominated by model year, it's clear that the average price of cluster 2 is higher than cluster 1.
 
-2. Hierarchical Clustering 
 
-Next, we will try hierarchical clustering with three different linkage methods(single, complete, and average) using euclidean distance. Hierarchical Clustering begins with each data point starting as its own cluster. The goal is to progressively group them together until there is only one group. The process involves choosing the closest two groups, calculated through a specific distance metric. The features we will cluster is 
+
+### 2. Hierarchical Clustering 
+
+Next, we will try hierarchical clustering with three different linkage methods(single, complete, and average) using euclidean distance. Hierarchical Clustering begins with each data point starting as its own cluster. The goal is to progressively group them together until there is only one group. The process involves choosing the closest two groups, calculated through a specific distance metric. 
 ```{r, echo=FALSE}
 #numeric_data <- data[, c("model_year", "price")]
 numeric_data <- data[, sapply(data, is.numeric)]
 numeric_data_without_price <- numeric_data[, !colnames(numeric_data) %in% "price"]
-colnames(numeric_data)
+
 ```
-These are all numeric features as clustering requires numeric features
+Removing non-numeric features as clustering requires numeric features. Also, removed the target feature price.
 
 ```{r, echo=FALSE}
 
@@ -605,7 +602,7 @@ par(mfrow = c(1, 1))  # Reset plotting layout
 
 
 ```
-We will use complete linkage as it looks like it generates pretty distinct clusters
+We will use complete linkage as it looks like it generates fairly distinct clusters
 
 
 ```{r, echo=FALSE}
@@ -634,13 +631,17 @@ cluster_summary <- data %>%
 
 # Print the cluster summary
 print(cluster_summary)
+
+
+
+
 ```
-There are a lot of correlations here that make sense between the 2 clusters. Cluster 1, with a more recent avg_model_year, also has a lower avg_mileage and a lower avg_accident rate, probably because the car has been driven for less time, this cluster also has a much higher avg_price in comparison to cluster 2. The data isn't distributed very well however as a vast majority of the points sit in cluster 1, perhaps suggesting that hierarchical clustering isn't suitable for this dataset.
+There are a lot of correlations here that make sense between the 2 clusters. Cluster 1, with a more recent avg_model_year, also has a lower avg_mileage and a lower avg_accident rate, probably because the car has been driven for less time. This cluster also has a much higher avg_price in comparison to cluster 2. The data isn't distributed very well however as a vast majority of the points sit in cluster 1, perhaps suggesting that hierarchical clustering isn't suitable for this dataset.
 
 
-3. Spectral Clustering 
+### 3. Spectral Clustering 
 
-Finally, we will try spectral clustering, which aims to group observations based on their proximity information. This method involves 2 main steps, the first being using the eigenvalues of a similarity matrix to perform dimension reduction, followed by applying a clustering algorithm like K-means. The same features as hierarchical clustering will be used
+Finally, we will try spectral clustering, which aims to group observations based on their proximity information. This method involves 2 main steps, the first being using the eigenvalues of a similarity matrix to perform dimension reduction, followed by applying a clustering algorithm like K-means. 
 
 ```{r, echo=FALSE}
 
@@ -679,10 +680,14 @@ cluster_summary <- data %>%
 print(cluster_summary)
 
 
-ggplot(data %>% filter(!is.na(cluster)), aes(x = model_year, y = price, color = cluster)) +
+ggplot(data %>% filter(!is.na(cluster)), aes(x = model_year, y = mileage, color = cluster)) +
   geom_point(size = 2) +
-  labs(title = "Spectral Clustering Results", x = "Model Year", y = "Price") +
+  labs(title = "Spectral Clustering Results", x = "Model Year", y = "Mileage") +
   theme_minimal()
+
+
+
+
 ```
 We ran Spectral Clustering on a randomly selected 1000 row subset for the data as the computation time was taking too long for the full dataset.
 
@@ -734,7 +739,7 @@ Out of the three models, the Lasso model performs the best, with a RMSE of 11992
 
 ### 2. K Nearest Neighbors(KNN) 
 
-KNN regression works by calculating the k nearest training set data points to the test point and predicting the target value by taking the average of their target values. Because KNN is a distance based algorithm, it is sensitive to feature scaling. For example, if one feature has ranges from 1-10 and another one has 1-10000, distance calculations will be biased and results will suffer as a result. In addition to standardizing and normalizing our data, we will also perform Principal Component Analysis(PCA) to further reduce the dimensionality of our data and reduce noise, while retaining most of the overall variance. We will keep components that make up 90% of the explained variance. Finally, KNN is also sensitive to the choice of k. To find the optimal value of k, we will again perform k-fold cross validation. We will again, use RMSE to evaluate the performance of our model. 
+KNN regression works by calculating the k nearest training set data points to the test point and predicting the target value by taking the average of their target values. Because KNN is a distance based algorithm, it is sensitive to feature scaling. For example, if one feature has ranges from 1-10 and another one has 1-10000, distance calculations will be biased and results will suffer as a result. In addition to standardizing and normalizing our data, we will also perform Principal Component Analysis(PCA) to further reduce the dimensionality of our data and reduce noise, while retaining most of the overall variance. We will keep components that make up 90% of the explained variance. Finally, KNN is also sensitive to the choice of k. To find the optimal value of k, we will again perform k-fold cross validation. We will again use RMSE to evaluate the performance of our model. 
 ```{r, include=FALSE}
 set.seed(1)
 
@@ -801,9 +806,7 @@ svm_predictions <- predict(svm_model, newdata = as.matrix(xtest))
 #RMSE Calculation
 svm_rmse <- sqrt(mean((svm_predictions - ytest)^2)) #outputs 11054.76
 ```
-
 ### 4. Regression Trees
-
 Regression trees are another supervised machine learning algorithm that involves splitting the data into groups based on predictors, favoring homogeneity within each leaf. Again, we use RMSE to evaluate the performance since that metric is directly comparable with other models. Parameter tuning was done with standard grid search over the 3 parameters of cp, minsplit, and maxdepth. 
 
 - cp (complexity parameter) controls the size of the tree by penalizing splits that do not significantly reduce the error.
@@ -813,6 +816,8 @@ Regression trees are another supervised machine learning algorithm that involves
 Each parameter impacts the model's bias-variance tradeoff: higher cp and smaller maxdepth favor simpler models (higher bias, lower variance), while lower cp and greater maxdepth risk overfitting (lower bias, higher variance). 
 
 ```{r echo=FALSE}
+library(rpart)
+library(rpart.plot)
 set.seed(1)
 y_factor = data$price
 train_index <- createDataPartition(y_factor, p = 0.8, list = FALSE)
@@ -824,9 +829,10 @@ test_data = data[-train_index, ]
 cp_values <- seq(0.001, 0.05, by = 0.005)
 minsplit_values <- c(10, 20, 30)
 maxdepth_values <- c(5, 10, 15)
+```
 
+```{r echo = FALSE}
 results <- data.frame(cp = numeric(), minsplit = integer(), maxdepth = integer(), MSE = numeric())
-
 for (cp in cp_values) {
   for (minsplit in minsplit_values) {
     for (maxdepth in maxdepth_values) {
@@ -835,11 +841,7 @@ for (cp in cp_values) {
         data = train_data,
         control = rpart.control(cp = cp, minsplit = minsplit, maxdepth = maxdepth)
       )
-      
-      # Predict on validation set
       predictions <- predict(model, test_data)
-      
-      # Calculate MSE
       mse <- sqrt(mean((test_data$price - predictions)^2))
       
       # Store results
@@ -847,22 +849,19 @@ for (cp in cp_values) {
     }
   }
 }
+best_params <- results[which.min(results$MSE), ] #outputs cp = 0.001, minsplit = 10, maxdepth = 15 
 
-best_params <- results[which.min(results$MSE), ]
-
+#train with final model 
 rpart_model <- rpart(
         price ~ .,
         data = train_data,
         control = rpart.control(cp = best_params$cp, minsplit = best_params$minsplit, maxdepth = best_params$maxdepth)
       )
+#plot 
 importance <- rpart_model$variable.importance
-
 importance_sorted <- sort(importance, decreasing = TRUE)
-
 barplot(importance_sorted, main = "Variable Importance", col = "blue", las = 2)
-print(best_params)
 ```
-
 Our final regression tree model has cp = 0.001, minsplit = 10, and maxdepth = 15. This model achieves an RMSE of 11703.85.
 
 One of the advantages of regression trees is its interpretability. The plot of variable importance shows that the top influential variables in descending order are mileage, horsepower, model year, and cylinders. These results also somewhat overlap in the importance of variables between our linear model and random forest.
@@ -930,7 +929,7 @@ randomforest_rmse = sqrt(lowest_mse) #evalulates to 9497.301
 ```
 Our final Random Forest model has ntree = 500, mtry = 5, and nodesize = 1. This model achieves an RMSE of 9497.301, the lowest among all models we've tested, aligning perfectly with the findings of one of the literature studies we looked at. 
 
-A Random Forest model also provides an advantage with its interpretability. It's able to provide the importance of variables, as seen in the plot below. From the plot, we can see the most influential variables in descending order are as follows: mileage, horsepower, model_year, and displacement. These results also some overlap in the importance of variables between our linear model and regression trees.
+A Random Forest model also provides an advantage with its interpretability. It's able to provide the importance of variables, as seen in the plot below. From the plot, we can see the most influential variables in descending order are as follows: mileage, horsepower, model_year, and displacement. These results also somewhat overlap in the importance of variables between our linear model and regression trees.
 ```{r}
 varImpPlot(best_model)
 ```
@@ -969,13 +968,13 @@ data <- data %>%
 data$brand = factor(data$brand)
 
 dummy_model <- dummyVars(~ ., data = data)
-data_one_hot <- as.data.frame(predict(dummy_model, newdata = data))
+data_one_hot2 <- as.data.frame(predict(dummy_model, newdata = data))
 
 #sapply(data_one_hot, class)
 ```
 ```{r, echo=FALSE}
-X = as.matrix(data_one_hot[, -1])
-y = as.vector(data_one_hot$price)
+X = as.matrix(data_one_hot2[, -1])
+y = as.vector(data_one_hot2$price)
 lassomodel = cv.glmnet(x = X, y = y, nfolds = 10, alpha = 1)
 ```
 
@@ -1006,11 +1005,11 @@ cat("Randomly picked Toyota Car: 4Runner TRD Off Road. Year of Model: 2019\nPred
 ```
 The original MSRP was approximately 40,395. Our model predicted the car to be around 26,000 higher than the actual price. 
 
+
 ```{r, echo = FALSE}
 set.seed(2)
 ford_car <- entiredata[entiredata$brand == "Ford", ]
 ford_car <- ford_car[sample(nrow(ford_car), 1), ]
-ford_car
 ford_new <- data.frame(
   brand.Audi = 0,
   brand.BMW = 0,
@@ -1057,80 +1056,9 @@ The original MSRP was approximately 98300. Our model predicted the car to be aro
 
 Overall, the model seems to be overestimating the original prices of the used cars. There could be other useful variables that we should have included in our dataset that would have contributed to a more accurate analysis of calculating the original price. The model also seems to do a better job for estimating original prices for more luxury brand cars, alluding to the fact that there may be potential bias towards features and relationships associated with expensive vehicles. This discrepancy could also be because there was an underrrepsentation of economy brands/cars in the dataset, which may have skewed the results. 
 
-### Original Price Estimation and Comparison  
-We selected one car each from Toyota, Ford, and Porsche and using the trained model, predicted the "brand-new" price for each car. Then, we searched online for the actual original release prices of these cars and compared them with the model's predictions. R Code is hidden to make the report more easy to read.  
-```{r, echo=FALSE}
-set.seed(432)
-entiredata <- read.csv("used_cars.csv")
-toyota_car <- entiredata[entiredata$brand == "Toyota", ]
-toyota_car <- toyota_car[sample(nrow(toyota_car), 1), ]
+## Appendix 
 
-toyota_new <- data.frame(
-  brand.Audi = 0,
-  brand.BMW = 0,
-  brand.Chevrolet = 0,
-  brand.Ford = 0,
-  brand.Mercedes.Benz = 0,
-  brand.Porsche = 0,
-  brand.Toyota = 1,
-  mileage = 0,
-  accident = 0,
-  clean_title = 1,
-  Age = 0
-)
-
-pred_toyota_new <- predict(lassomodel, newx = as.matrix(toyota_new), s = "lambda.min")
-cat("Randomly picked Toyota Car: 4Runner TRD Off Road. Year of Model: 2019\nPredicted Price: 66952.068")
+The full summary of our dataset, including one hot encoded variables is shown below. 
+```{r echo = FALSE}
+summary(data_one_hot)
 ```
-The original MSRP was approximately 40,395. Our model predicted the car to be around 26,000 higher than the actual price. 
-
-
-```{r, echo = FALSE}
-set.seed(432)
-ford_car <- entiredata[entiredata$brand == "Ford", ]
-ford_car <- ford_car[sample(nrow(ford_car), 1), ]
-#ford_car
-ford_new <- data.frame(
-  brand.Audi = 0,
-  brand.BMW = 0,
-  brand.Chevrolet = 0,
-  brand.Ford = 1,
-  brand.Mercedes.Benz = 0,
-  brand.Porsche = 0,
-  brand.Toyota = 0,
-  mileage = 0,
-  accident = 0,
-  clean_title = 1,
-  Age = 0
-)
-pred_ford_new <- predict(lassomodel, newx = as.matrix(ford_new), s = "lambda.min")
-#pred_ford_new
-cat("Randomly picked Ford Car: Ford Maverick XLT. Year of Model: 2022\nPredicted Price: 67774.82")
-```
-The original MSRP was approximately 29,541. Our model predicted the car to be around 37,000 higher than the actual price. 
-
-
-```{r, echo = FALSE}
-set.seed(432)
-porsche_car <- entiredata[entiredata$brand == "Porsche", ]
-porsche_car <- porsche_car[sample(nrow(porsche_car), 1), ]
-
-porsche_new <- data.frame(
-  brand.Audi = 0,
-  brand.BMW = 0,
-  brand.Chevrolet = 0,
-  brand.Ford = 0,
-  brand.Mercedes.Benz = 0,
-  brand.Porsche = 1,
-  brand.Toyota = 0,
-  mileage = 0,
-  accident = 0,
-  clean_title = 1,
-  Age = 0
-)
-  
-pred_porsche_new <- predict(lassomodel, newx = as.matrix(porsche_new), s = "lambda.min")
-#pred_porsche_new
-cat("Randomly picked Porsche Car: 718 Spyder Base. Year of Model: 2022\nPredicted Price: 111831.508")
-```
-The original MSRP was approximately 98300. Our model predicted the car to be around 13500 higher than the actual price. 
