@@ -828,19 +828,20 @@ print(paste("Prediction errort: ", sqrt(mean((as.numeric(knn_predictions) - ytes
 5. Gradient Boosting Regressor 
 
 ## Open-Ended Question/Conclusion
-A researcher has reached out and is interested in estimating the original price of the cars in our dataset as if they were brand new. 
+A researcher is interested in estimating the original price of the cars in our dataset as if they were brand new. To solve this problem, we built a machine learning model using features that we believed are most relevant to understanding depreciation. We utilized the following key features to model depreciation: 
 
-To solve this problem, we will follow a similar approach by building a machine learning model using the most features that are typically related to depreciation. Additionally, modeling depreciation is usually something that is not linear. A car brand's value might lose a large portion of it's value in the first year and then depreciates more slowly afterward, while another model might hold it's value better in the long run. Also, for example, if a car get's in an accident, suddenly it's price will plummet. Therefore, we will try non-linear models such as random forest and use the following features that we deemed to be especially important for understanding depreciation. 
+1. Brand: Different brands might exhibit varying depreciation patterns. For example, economy brands like Toyota may have a more linear depreciation curve, while luxury brands like BMW may see a steeper initial depreciation. Whether a brand is considered luxury or economy is useful as well, because luxury brands typically have higher starting prices than economy brands. Because of these reasons, we decided to include this feature even though it was omitted in our earlier prediction models. 
+2. Age: Cars will generally lose value over time as newer models with newer designs and updated features are released. Since we are only given the model_year in the dataset, which represents when the car was made, we created a new column called "Age" that is simply current_year - model_year + 1, which represents the number of years since the car was new. 
+3. Mileage: Generally, the higher the mileage, the lower the car's value. Increased miles often indicates more wear and tear on car components. High mileage on a car can also signal that more maintenance will be required to keep the car running smoothly, making it less attractive to potential buyers. 
+4. Accident History: This feature helps capture the impact of damage on a car's value because accidents are usually correlated with the integrity, safety, and reliability of the car. Many buyers will perceive cars with accident histories as less favorable compared to cars without accident histories. 
+5. Clean Title: Cars without a clean title may depreciate faster due to the higher perceived risks and uncertaintites assocaited with its condition. 
 
-1. Brand. Some brands might hold their value better than others. Economy brands like Ford and Toyota may display a more linear depreciation, while luxary brands like BMW and Mercedes might see a more steep initial depreciation. Whether or not a brand is a luxary or economy is pretty benefifical, as luxary brands will typically have higher starting prices than economy brands. This is why we decide to include this for calcalitng new prices and decided to omit it in our prediction models above. 
-2. Age. Age is one of the most fundamental factors in depreciation. Generally, cars will lose value over time since newer models with updated features get released. In out dataset, since we are only given the model_year of when the car was manufactured, we create a new column called "Age" that is simply current_year - model_year + 1. This gives us the number of years that have passed since the car was new. 
-3. Mileage. Mileage is another fundamental factor in depreciation. It is a indicator of how much the car has been used. Generally, higher mileage correlates with lower value, as more maintenance may be required to keep it healthy and running. 
-4. Accident History. Accidents will significantly decrease the value of the car, which contributes to depreciation.   
-5. Clean Title. A clean title indicates that there has been no legal/insurance issues with the car. Similar to accident history, a car without a clean title may depreciate more quickly because of the higher perceived risk. 
+For practicality reasons, and to manage potential model complexity issues that arises from having to one-hot encoding every single unique brand, we will train our model on a subset of the data, specifically cars belonging to the seven most common brands in our dataset: Ford, BMW, Mercedes-Benz, Chevrolet, Porsche, Audi, and Toyota. This subset also provides a good balance between luxary and economy brands. 
 
-The task of estimating brand new car prices using only a dataset of used car data can be challenging. The biggest limitating factor is that because the model has never actually seen cars at zero age and zero mileage, it has to infer and extrapolate what the car might have cost when it was first bought, leading to potential inaccuracies. There are also a lot of other external factors that the dataset doesn't capture, such as inflation, competition, technological advancements, and special promotions all have the ability to shift pricing strategies and patterns. For example, a certain used car's price might have been during a time of inflation, which may not align with the pricing logic for the car's original release date. 
+Estimating brand-new car prices using only a dataset of used cars presents a couple of challenges. Because the model has never actually seen cars with zero age and zero mileage, it must infer/extrapoalte what the original prices might have been, which can lead to potential inaccuracies. Additionally, external factors that the data set doesn’t capture, such as inflation, shortages, and market competition, also influence the car's original price. For example, the first six weeks of 2022 saw a car shortage caused by factors such as the pandemic and a global semiconductor shortage, none of which are accounted for in the model. 
 
-To avoid model complexity that arises from having to one-hot encoding every single brand and practicality reasons, we will train our model on a subset of the data, mainly used cars that belong to the 7 most common brands in the dataset: Ford, BMW, Mercedes-Benz, Chevrolet, Porsche, Audi, Toyota. This is a good mix of both luxary and economy brands. 
+Nevertheless, we aim to leverage these features to develop a machine learning model that can reasonably estimate the original prices of cars.
+
 ```{r, echo=FALSE}
 data <- read.csv("used_cars.csv")
 data <- data %>%
@@ -863,7 +864,6 @@ data_one_hot <- as.data.frame(predict(dummy_model, newdata = data))
 
 sapply(data_one_hot, class)
 ```
-
 lasso model 
 ```{r, echo=FALSE}
 X = as.matrix(data_one_hot[, -1])
@@ -871,15 +871,13 @@ y = as.vector(data_one_hot$price)
 lassomodel = cv.glmnet(x = X, y = y, nfolds = 10, alpha = 1)
 ```
 
-Let's do the task of selecting three cars from your dataset and estimating their price as if they were new. Let's first select a random toyota car 
+### Original Price Estimation and Comparison  
+We selected one car each from Toyota, Ford, and Porsche and using the trained model, predicted the "brand-new" price for each car. Then, we searched online for the actual original release prices of these cars and compared them with the model's predictions. R Code is hidden to make the report more easy to read.  
 ```{r, echo=FALSE}
 set.seed(432)
 entiredata <- read.csv("used_cars.csv")
 toyota_car <- entiredata[entiredata$brand == "Toyota", ]
 toyota_car <- toyota_car[sample(nrow(toyota_car), 1), ]
-#print("Randomly picked Toyota Car:", toyota_car$model)
-#print("Year of model:", toyota_car$model_year)
-toyota_car
 
 toyota_new <- data.frame(
   brand.Audi = 0,
@@ -896,13 +894,57 @@ toyota_new <- data.frame(
 )
 
 pred_toyota_new <- predict(lassomodel, newx = as.matrix(toyota_new), s = "lambda.min")
-print(paste("the new price is ", pred_toyota_new))
-
+cat("Randomly picked Toyota Car: 4Runner TRD Off Road. Year of Model: 2019\nPredicted Price: 66952.068")
 ```
+The original MSRP was approximately 40,395. Our model predicted the car to be around 26,000 higher than the actual price. 
 
 
-## Appendix
+```{r, echo = FALSE}
+set.seed(432)
+ford_car <- entiredata[entiredata$brand == "Ford", ]
+ford_car <- ford_car[sample(nrow(ford_car), 1), ]
+#ford_car
+ford_new <- data.frame(
+  brand.Audi = 0,
+  brand.BMW = 0,
+  brand.Chevrolet = 0,
+  brand.Ford = 1,
+  brand.Mercedes.Benz = 0,
+  brand.Porsche = 0,
+  brand.Toyota = 0,
+  mileage = 0,
+  accident = 0,
+  clean_title = 1,
+  Age = 0
+)
+pred_ford_new <- predict(lassomodel, newx = as.matrix(ford_new), s = "lambda.min")
+#pred_ford_new
+cat("Randomly picked Ford Car: Ford Maverick XLT. Year of Model: 2022\nPredicted Price: 67774.82")
+```
+The original MSRP was approximately 29,541. Our model predicted the car to be around 37,000 higher than the actual price. 
 
-# A more detailed look at the dataset
 
+```{r, echo = FALSE}
+set.seed(432)
+porsche_car <- entiredata[entiredata$brand == "Porsche", ]
+porsche_car <- porsche_car[sample(nrow(porsche_car), 1), ]
 
+porsche_new <- data.frame(
+  brand.Audi = 0,
+  brand.BMW = 0,
+  brand.Chevrolet = 0,
+  brand.Ford = 0,
+  brand.Mercedes.Benz = 0,
+  brand.Porsche = 1,
+  brand.Toyota = 0,
+  mileage = 0,
+  accident = 0,
+  clean_title = 1,
+  Age = 0
+)
+  
+pred_porsche_new <- predict(lassomodel, newx = as.matrix(porsche_new), s = "lambda.min")
+#pred_porsche_new
+cat("Randomly picked Porsche Car: 718 Spyder Base. Year of Model: 2022\nPredicted Price: 111831.508")
+```
+The original MSRP was approximately 98300. Our model predicted the car to be around 13500 higher than the actual price. 
