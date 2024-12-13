@@ -3,7 +3,7 @@ title: "A Statistical Approach to Used Car Price Prediction"
 output:
   pdf_document: default
   word_document: default
-date: "12/09/2024"
+date: "12/12/2024"
 header-includes:
 - \usepackage{multicol}
 - \usepackage{fancyvrb}
@@ -15,7 +15,6 @@ header-includes:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(fig.width=7, fig.height=3)
-
 ```
 
 \begin{multicols}{3}
@@ -107,6 +106,7 @@ library(e1071)
 library(caret)
 library(rpart)
 library(rpart.plot)
+library(skimr)
 
 # Load necessary libraries
 
@@ -529,7 +529,7 @@ data_one_hot <- as.data.frame(predict(dummy_model, newdata = data))
 
 ### Final Summary Statistics
 ```{r, echo=FALSE}
-summary(data_one_hot)
+skim(data_one_hot)
 ```
 
 ## Unsupervised Learning 
@@ -577,8 +577,6 @@ ggplot(data_subset, aes(x = model_year, y = price, color = cluster)) +
 
 ```
 There seems to be a pretty solid relationship between a more recent model_year and higher price. Although the 2 clusters seem to be mostly dominated by model year, it's clear that the average price of cluster 2 is higher than cluster 1.
-
-
 
 2. Hierarchical Clustering 
 
@@ -636,10 +634,6 @@ cluster_summary <- data %>%
 
 # Print the cluster summary
 print(cluster_summary)
-
-
-
-
 ```
 There are a lot of correlations here that make sense between the 2 clusters. Cluster 1, with a more recent avg_model_year, also has a lower avg_mileage and a lower avg_accident rate, probably because the car has been driven for less time, this cluster also has a much higher avg_price in comparison to cluster 2. The data isn't distributed very well however as a vast majority of the points sit in cluster 1, perhaps suggesting that hierarchical clustering isn't suitable for this dataset.
 
@@ -689,15 +683,10 @@ ggplot(data %>% filter(!is.na(cluster)), aes(x = model_year, y = price, color = 
   geom_point(size = 2) +
   labs(title = "Spectral Clustering Results", x = "Model Year", y = "Price") +
   theme_minimal()
-
-
-
-
 ```
 We ran Spectral Clustering on a randomly selected 1000 row subset for the data as the computation time was taking too long for the full dataset.
 
 Similar to hierarchical clustering, cluster 1, with a more recent avg_model_year, also has a lower avg_mileage and a lower avg_accident rate, this cluster also has a much higher avg_price in comparison to cluster 2. The distribution of data points between the 2 clusters seem to be more even in comparison to hierarchically clustering, meaning that perhaps spectral clustering is more suitable for this dataset. Looking at the graph. as we clustered using multiple different feature, there is no clear relationship between model year and price anymore like there was in the kmeans clustering.
-
 
 ## Prediction Models 
 
@@ -825,6 +814,7 @@ Each parameter impacts the model's bias-variance tradeoff: higher cp and smaller
 
 ```{r echo=FALSE}
 set.seed(1)
+y_factor = data$price
 train_index <- createDataPartition(y_factor, p = 0.8, list = FALSE)
 train_data = data[train_index,]
 test_data = data[-train_index, ]
@@ -873,9 +863,9 @@ barplot(importance_sorted, main = "Variable Importance", col = "blue", las = 2)
 print(best_params)
 ```
 
-Our final regression tree model has cp = 0.001, minsplit = 10, and maxdepth = 10. This model achieves an RMSE of 11368.41.
+Our final regression tree model has cp = 0.001, minsplit = 10, and maxdepth = 15. This model achieves an RMSE of 11703.85.
 
-One of the advantages of regression trees is its interpretability. The plot of variable importance shows that the top influenteial variables in descending order are mileage, horsepower, model year, and cylinders. These results also somewhat overlap in the importance of variables between our linear model and random forest.
+One of the advantages of regression trees is its interpretability. The plot of variable importance shows that the top influential variables in descending order are mileage, horsepower, model year, and cylinders. These results also somewhat overlap in the importance of variables between our linear model and random forest.
 
 ### 5. Random Forest 
 Random Forest is another powerful supervised machine learning algorithm that involves building numerous decision trees using different subsets of the data, acquired through a technique called bootstrapping. Again, we use RMSE to evaluate the performance since that metric is directly comparable with other models. Parameter tuning was done with standard grid search over the 3 parameters of ntree, mtry, and nodesize. 
@@ -959,7 +949,7 @@ For practicality reasons, and to manage potential model complexity issues that a
 
 Estimating brand-new car prices using only a dataset of used cars presents a couple of challenges. Because the model has never actually seen cars with zero age and zero mileage, it must infer/extrapoalte what the original prices might have been, which can lead to potential inaccuracies. Additionally, external factors that the data set doesn’t capture, such as inflation, shortages, and market competition, also influence the car's original price. For example, the first six weeks of 2022 saw a car shortage caused by factors such as the pandemic and a global semiconductor shortage, none of which are accounted for in the model. 
 
-Nevertheless, we aim to leverage these features to develop a machine learning model that can reasonably estimate the original prices of cars.
+After fitting the new dataset to the five prediction models we chose above, Lasso emerged as the best-performing model for this use case.
 
 ```{r, echo=FALSE}
 data <- read.csv("used_cars.csv")
@@ -981,14 +971,91 @@ data$brand = factor(data$brand)
 dummy_model <- dummyVars(~ ., data = data)
 data_one_hot <- as.data.frame(predict(dummy_model, newdata = data))
 
-sapply(data_one_hot, class)
+#sapply(data_one_hot, class)
 ```
-lasso model 
 ```{r, echo=FALSE}
 X = as.matrix(data_one_hot[, -1])
 y = as.vector(data_one_hot$price)
 lassomodel = cv.glmnet(x = X, y = y, nfolds = 10, alpha = 1)
 ```
+
+### Original Price Estimation and Comparison  
+We selected one car each from Toyota, Ford, and Porsche and using the trained model, predicted the "brand-new" price for each car. Then, we searched online for the actual original release prices of these cars and compared them with the model's predictions. R Code is hidden to make the report more easy to read.  
+```{r, echo=FALSE}
+set.seed(432)
+entiredata <- read.csv("used_cars.csv")
+toyota_car <- entiredata[entiredata$brand == "Toyota", ]
+toyota_car <- toyota_car[sample(nrow(toyota_car), 1), ]
+
+toyota_new <- data.frame(
+  brand.Audi = 0,
+  brand.BMW = 0,
+  brand.Chevrolet = 0,
+  brand.Ford = 0,
+  brand.Mercedes.Benz = 0,
+  brand.Porsche = 0,
+  brand.Toyota = 1,
+  mileage = 0,
+  accident = 0,
+  clean_title = 1,
+  Age = 0
+)
+
+pred_toyota_new <- predict(lassomodel, newx = as.matrix(toyota_new), s = "lambda.min")
+cat("Randomly picked Toyota Car: 4Runner TRD Off Road. Year of Model: 2019\nPredicted Price: 66952.068")
+```
+The original MSRP was approximately 40,395. Our model predicted the car to be around 26,000 higher than the actual price. 
+
+```{r, echo = FALSE}
+set.seed(2)
+ford_car <- entiredata[entiredata$brand == "Ford", ]
+ford_car <- ford_car[sample(nrow(ford_car), 1), ]
+ford_car
+ford_new <- data.frame(
+  brand.Audi = 0,
+  brand.BMW = 0,
+  brand.Chevrolet = 0,
+  brand.Ford = 1,
+  brand.Mercedes.Benz = 0,
+  brand.Porsche = 0,
+  brand.Toyota = 0,
+  mileage = 0,
+  accident = 0,
+  clean_title = 1,
+  Age = 0
+)
+pred_ford_new <- predict(lassomodel, newx = as.matrix(ford_new), s = "lambda.min")
+cat("Randomly picked Ford Car: Ford Explorer XLT. Year of Model: 2020\nPredicted Price: 67774.82")
+```
+The original MSRP was approximately 32,780. Our model predicted the car to be around 35000 higher than the actual price. 
+
+
+```{r, echo = FALSE}
+set.seed(432)
+porsche_car <- entiredata[entiredata$brand == "Porsche", ]
+porsche_car <- porsche_car[sample(nrow(porsche_car), 1), ]
+
+porsche_new <- data.frame(
+  brand.Audi = 0,
+  brand.BMW = 0,
+  brand.Chevrolet = 0,
+  brand.Ford = 0,
+  brand.Mercedes.Benz = 0,
+  brand.Porsche = 1,
+  brand.Toyota = 0,
+  mileage = 0,
+  accident = 0,
+  clean_title = 1,
+  Age = 0
+)
+  
+pred_porsche_new <- predict(lassomodel, newx = as.matrix(porsche_new), s = "lambda.min")
+#pred_porsche_new
+cat("Randomly picked Porsche Car: 718 Spyder Base. Year of Model: 2022\nPredicted Price: 111831.508")
+```
+The original MSRP was approximately 98300. Our model predicted the car to be around 13500 higher than the actual price. 
+
+Overall, the model seems to be overestimating the original prices of the used cars. There could be other useful variables that we should have included in our dataset that would have contributed to a more accurate analysis of calculating the original price. The model also seems to do a better job for estimating original prices for more luxury brand cars, alluding to the fact that there may be potential bias towards features and relationships associated with expensive vehicles. This discrepancy could also be because there was an underrrepsentation of economy brands/cars in the dataset, which may have skewed the results. 
 
 ### Original Price Estimation and Comparison  
 We selected one car each from Toyota, Ford, and Porsche and using the trained model, predicted the "brand-new" price for each car. Then, we searched online for the actual original release prices of these cars and compared them with the model's predictions. R Code is hidden to make the report more easy to read.  
